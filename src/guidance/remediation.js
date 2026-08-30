@@ -1,0 +1,95 @@
+/**
+ * Generates rich, deterministic Remediation Blueprints without requiring any AI.
+ */
+
+export function generateRemediationBlueprint(taskMeta) {
+  const {
+    ruleId,
+    cluster,
+    componentHypothesis,
+    technologyContext,
+    wcag = []
+  } = taskMeta;
+
+  const pagesCount = cluster.pagesCount || 1;
+  const occurrencesCount = cluster.occurrencesCount || 1;
+  const isMultiPage = pagesCount > 1;
+
+  let problem = `Accessibility failure for rule '${ruleId}'.`;
+  let whySystemic = isMultiPage
+    ? `This pattern recurs across ${pagesCount} pages (${occurrencesCount} total occurrences), indicating a shared component, template, or global token.`
+    : `This failure was observed on a single page, but may affect other instances of this component.`;
+  let likelyRootCause = componentHypothesis?.rationale || 'Reused markup structure in site templates.';
+  let whatNeedsToChange = 'Update the element markup or styling to satisfy WCAG criteria.';
+  let humanDecisionsRequired = [];
+  let targetMarkup = null;
+  let verificationSteps = [
+    'Inspect the element in the browser Accessibility Tree inspector.',
+    'Test with keyboard navigation to verify focusability and tab order.',
+    'Verify using a screen reader (VoiceOver, NVDA, or JAWS).',
+    'Re-run automated accessibility scans.'
+  ];
+
+  if (ruleId === 'link-name') {
+    problem = 'Links do not have discernible, accessible text communicating their destination.';
+    whatNeedsToChange = 'Provide accessible text for the link using visible text or an aria-label attribute.';
+    humanDecisionsRequired = [
+      'Confirm the human-readable destination name for each link (e.g. "Visit Drupal Asheville on LinkedIn").',
+      'Determine whether to use visually hidden text (.sr-only) or aria-label.'
+    ];
+    targetMarkup = `<a href="..." class="social-link" aria-label="Visit our profile on LinkedIn">\n  <span class="icon-linkedin" aria-hidden="true"></span>\n</a>`;
+    verificationSteps = [
+      'Inspect the computed accessible name in the browser DevTools Accessibility tab.',
+      'Tab to the link and verify the screen reader announces the link purpose clearly.',
+      'Re-run automated axe check to verify link-name passes.'
+    ];
+  } else if (ruleId === 'color-contrast') {
+    problem = 'Elements have insufficient color contrast between text and background.';
+    whatNeedsToChange = 'Adjust the text color or background color token in the theme stylesheet to meet the minimum 4.5:1 ratio.';
+    humanDecisionsRequired = [
+      'Consult with Visual Design to select an approved brand color palette token that achieves at least 4.5:1 contrast.',
+      'Confirm if font size/weight can be adjusted if 3:1 ratio is preferred for large text.'
+    ];
+    targetMarkup = `/* In theme stylesheet / design tokens */\n:root {\n  --color-brand-primary: #d44d10; /* Adjusted for 4.5:1 contrast against white */\n}`;
+    verificationSteps = [
+      'Inspect contrast ratio using browser DevTools color picker.',
+      'Verify readability in operating system High Contrast / Forced Colors mode.',
+      'Re-run automated color-contrast check.'
+    ];
+  } else if (ruleId === 'image-alt') {
+    problem = 'Images missing alt attribute prevent non-sighted users from understanding image content.';
+    whatNeedsToChange = 'Add an appropriate alt attribute to every <img> element.';
+    humanDecisionsRequired = [
+      'Determine whether the image is informative (requires descriptive alt text) or decorative (requires alt="").'
+    ];
+    targetMarkup = `<img src="/assets/photo.jpg" alt="Conference attendees gathered at the opening keynote" />`;
+    verificationSteps = [
+      'Verify presence of alt attribute on <img> in DOM.',
+      'Verify screen reader reads the alternative text or skips decorative image.',
+      'Re-run automated image-alt check.'
+    ];
+  } else if (ruleId === 'region') {
+    problem = 'Content is not contained within landmark regions.';
+    whatNeedsToChange = 'Wrap major page areas in semantic HTML5 elements (<header>, <nav>, <main>, <footer>).';
+    humanDecisionsRequired = [
+      'Confirm primary page content boundaries for <main>.',
+      'Ensure each <nav> landmark has a distinguishing aria-label if multiple navigation menus exist.'
+    ];
+    targetMarkup = `<header>...</header>\n<nav aria-label="Main Navigation">...</nav>\n<main>\n  <!-- Primary page content -->\n</main>\n<footer>...</footer>`;
+    verificationSteps = [
+      'Verify landmark navigation shortcuts in screen reader.',
+      'Confirm exactly one <main> element per page.'
+    ];
+  }
+
+  return {
+    problem,
+    systemicRationale: whySystemic,
+    likelyRootCause,
+    whatNeedsToChange,
+    humanDecisionsRequired,
+    targetMarkup,
+    verificationSteps,
+    nativeSemanticsFirst: true
+  };
+}

@@ -1,0 +1,74 @@
+{
+  "1.1.1": {
+    "name": "Non-text Content",
+    "level": "A",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html",
+    "ruleIds": ["image-alt", "input-image-alt", "object-alt"]
+  },
+  "1.3.1": {
+    "name": "Info and Relationships",
+    "level": "A",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html",
+    "ruleIds": ["region", "heading-order", "empty-heading", "list", "listitem"]
+  },
+  "1.4.3": {
+    "name": "Contrast (Minimum)",
+    "level": "AA",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+    "ruleIds": ["color-contrast"]
+  },
+  "1.4.10": {
+    "name": "Reflow",
+    "level": "AA",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/reflow.html",
+    "ruleIds": ["meta-viewport", "meta-viewport-large"]
+  },
+  "1.4.11": {
+    "name": "Non-text Contrast",
+    "level": "AA",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+    "ruleIds": ["non-text-contrast"]
+  },
+  "2.4.4": {
+    "name": "Link Purpose (In Context)",
+    "level": "A",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/link-purpose-in-context.html",
+    "ruleIds": ["link-name", "link-in-text-block"]
+  },
+  "2.4.6": {
+    "name": "Headings and Labels",
+    "level": "AA",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/headings-and-labels.html",
+    "ruleIds": ["empty-heading", "page-has-heading-one"]
+  },
+  "2.4.7": {
+    "name": "Focus Visible",
+    "level": "AA",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html",
+    "ruleIds": ["focus-visible"]
+  },
+  "2.4.11": {
+    "name": "Focus Not Obscured (Minimum)",
+    "level": "AA",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html",
+    "ruleIds": ["focus-not-obscured"]
+  },
+  "2.5.8": {
+    "name": "Target Size (Minimum)",
+    "level": "AA",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html",
+    "ruleIds": ["target-size"]
+  },
+  "3.1.1": {
+    "name": "Language of Page",
+    "level": "A",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/language-of-page.html",
+    "ruleIds": ["html-has-lang", "html-lang-valid"]
+  },
+  "4.1.2": {
+    "name": "Name, Role, Value",
+    "level": "A",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html",
+    "ruleIds": ["button-name", "aria-roles", "aria-valid-attr", "aria-valid-attr-value"]
+  }
+}

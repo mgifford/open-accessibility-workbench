@@ -1,0 +1,77 @@
+{
+  "link-name": {
+    "problem": "Links lacking discernible text prevent screen reader users from understanding where the link navigates.",
+    "whySystemic": "Often occurs in shared navigation bars, footer social icon links, or card link components across multiple pages.",
+    "likelyRootCause": "Icon font or SVG icon rendered inside an <a> tag without accompanying text or accessible label.",
+    "humanDecisionsRequired": [
+      "Confirm the intended destination or label for each icon link (e.g., \"Visit our LinkedIn page\").",
+      "Decide whether the link text should be visually hidden (.sr-only) or provided via aria-label."
+    ],
+    "implementation": [
+      "Prefer visible link text or visually hidden text (<span class=\"sr-only\">LinkedIn</span>) over ARIA attributes.",
+      "If an icon-only link is strictly required by design, add aria-label=\"Descriptive destination\" directly on the <a> element.",
+      "Do not add ARIA roles to native <a> elements with valid href."
+    ],
+    "verificationSteps": [
+      "Inspect the computed accessible name in the browser Accessibility Tree inspector.",
+      "Navigate to the link using keyboard Tab and verify focus visibility and screen reader readout.",
+      "Re-run automated axe / Open Scans rule to confirm the violation is resolved."
+    ]
+  },
+  "color-contrast": {
+    "problem": "Low contrast between foreground text and background colors makes text difficult or impossible to read for users with low vision or in high ambient light.",
+    "whySystemic": "Usually caused by shared brand color tokens (e.g. orange on white, light grey footer text) defined in global CSS or design system variables.",
+    "likelyRootCause": "Theme design token value has insufficient luminance contrast ratio (< 4.5:1).",
+    "humanDecisionsRequired": [
+      "Consult with Visual Design to adjust the foreground or background color palette token to achieve at least 4.5:1 ratio.",
+      "Confirm if font weight can be increased to bold 14pt+ or regular 18pt+ if 3:1 ratio is targeted."
+    ],
+    "implementation": [
+      "Adjust CSS custom property / design token value in the global theme stylesheet rather than adding inline styles.",
+      "Ensure hover, focus, and active interactive states also maintain sufficient contrast."
+    ],
+    "verificationSteps": [
+      "Use the browser DevTools color picker to verify contrast ratio >= 4.5:1.",
+      "Test in forced-colors / high-contrast operating system mode.",
+      "Re-run automated contrast check."
+    ]
+  },
+  "image-alt": {
+    "problem": "Images missing text alternatives fail to convey their information or purpose to non-sighted users.",
+    "whySystemic": "CMS template or authoring field does not require an alt attribute when rendering media.",
+    "likelyRootCause": "Template renders <img> without alt attribute, or CMS editor omitted alt text during content entry.",
+    "humanDecisionsRequired": [
+      "Determine if the image is informative or decorative.",
+      "If informative, write concise alternative text conveying the essential visual information.",
+      "If decorative, confirm it should receive alt=\"\" and aria-hidden=\"true\"."
+    ],
+    "implementation": [
+      "For informative images, add descriptive alt attribute: <img src=\"...\" alt=\"Description\">.",
+      "For decorative images, provide an explicit empty alt attribute: <img src=\"...\" alt=\"\">.",
+      "Never omit the alt attribute entirely on HTML <img> tags."
+    ],
+    "verificationSteps": [
+      "Check HTML markup for presence of alt attribute.",
+      "Inspect screen reader announcement.",
+      "Re-run automated scanner check."
+    ]
+  },
+  "region": {
+    "problem": "Content outside landmark regions is difficult for screen reader users to navigate efficiently.",
+    "whySystemic": "Base page layout template lacks HTML5 semantic container tags (<header>, <main>, <footer>, <nav>).",
+    "likelyRootCause": "Generic <div> tags used for major layout wrappers instead of semantic elements.",
+    "humanDecisionsRequired": [
+      "Confirm the primary content boundary to be designated as <main>.",
+      "Identify global vs. section navigation menus."
+    ],
+    "implementation": [
+      "Wrap main content in a single <main> element.",
+      "Wrap header in <header> and footer in <footer>.",
+      "Ensure each <nav> landmark has a unique accessible name (e.g. aria-label=\"Primary\")."
+    ],
+    "verificationSteps": [
+      "Verify landmark navigation using screen reader landmark shortcuts (e.g. \"D\" key in NVDA/JAWS).",
+      "Confirm exactly one <main> landmark exists per document."
+    ]
+  }
+}

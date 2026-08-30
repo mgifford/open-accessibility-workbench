@@ -1,0 +1,179 @@
+{
+  "issueNumber": 347,
+  "issueUrl": "https://github.com/mgifford/open-scans/issues/347",
+  "issueTitle": "SCAN: Drupal Camp Asheville",
+  "scanTitle": "Drupal Camp Asheville",
+  "submittedBy": "tea-sharp",
+  "engines": [
+    "axe",
+    "qualweb"
+  ],
+  "scanContext": {
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "viewportPreset": "desktop",
+    "colorScheme": "both",
+    "browser": "firefox"
+  },
+  "scannedAt": "2026-08-20T17:07:27.574Z",
+  "totalElapsedMs": 33045,
+  "totalSubmitted": 2,
+  "acceptedCount": 2,
+  "scannedCount": 2,
+  "skippedDueToTimeout": 0,
+  "skippedDueToErrAborted": 0,
+  "rejectedCount": 0,
+  "rejected": [],
+  "axeTotals": {
+    "passed": 910,
+    "failed": 34,
+    "cantTell": 15,
+    "inapplicable": 90
+  },
+  "qualwebTotals": {
+    "passed": 397,
+    "failed": 19,
+    "cantTell": 104,
+    "inapplicable": 9
+  },
+  "results": [
+    {
+      "submittedUrl": "https://www.drupalasheville.com/",
+      "finalUrl": "https://www.drupalasheville.com/",
+      "redirected": false,
+      "statusCode": 200,
+      "ok": true,
+      "contentType": "text/html; charset=UTF-8",
+      "pageTitle": "Drupal Asheville | Asheville, NC | Drupal Camp Asheville",
+      "elapsedMs": 17289,
+      "error": null,
+      "scanContext": {
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "browser": "firefox"
+      },
+      "axe": {
+        "executed": true,
+        "error": null,
+        "counts": {
+          "passed": 453,
+          "failed": 24,
+          "cantTell": 7,
+          "inapplicable": 48
+        },
+        "failedRules": [
+          "color-contrast",
+          "link-name",
+          "region"
+        ],
+        "failures": [
+          {
+            "rule": "color-contrast",
+            "ruleUrl": "https://dequeuniversity.com/rules/axe/4.12/color-contrast?application=playwright",
+            "impact": "serious",
+            "wcagSc": [
+              "wcag2aa",
+              "wcag143"
+            ],
+            "xpath": "article[data-history-node-id=\"551\"] > header > .node__meta > .node__byline > .node__author > span > a[title=\"View user profile.\"][href$=\"amyjune-hineline\"]",
+            "html": "<a title=\"View user profile.\" href=\"/u/amyjune-hineline\">AmyJune Hineline</a>",
+            "message": "Elements must meet minimum color contrast ratio thresholds",
+            "fixSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #f26321, background color: #ffffff, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "isDuplicate": false,
+            "duplicateOf": null,
+            "fingerprint": "88a3ae653277",
+            "patternId": "A11Y-c4df9034",
+            "a11yPatternFingerprint": "7eb7c1914a8fade9544b105baf207a0fb9ee680ed76926daaec6a4ad835554e5",
+            "a11yPatternDisplayId": "A11Y-PAT-7EB7C1914A8F",
+            "a11yOccurrenceFingerprint": "136ecb56d2b8019210ef71c4adcc13c5f1028381ac56cc2c2ecf4c328e5ccb53",
+            "a11yOccurrenceDisplayId": "A11Y-OCC-136ECB56D2B8"
+          },
+          {
+            "rule": "link-name",
+            "ruleUrl": "https://dequeuniversity.com/rules/axe/4.12/link-name?application=playwright",
+            "impact": "serious",
+            "wcagSc": [
+              "wcag2a",
+              "wcag244",
+              "wcag412"
+            ],
+            "xpath": ".social-media-link-icon--linkedin",
+            "html": "<a class=\"social-media-link-icon--linkedin\" href=\"https://www.linkedin.com/company/drupal-asheville/\"><span class=\"fab fa-linkedin fa-2x\"></span></a>",
+            "message": "Links must have discernible text",
+            "fixSummary": "Fix all of the following:\n  Element is in tab order and does not have accessible text",
+            "isDuplicate": false,
+            "duplicateOf": null,
+            "fingerprint": "18f9780cb5f7",
+            "patternId": "A11Y-social-links",
+            "a11yPatternFingerprint": "944a9e5fa4e6b527cecb00eb5883ef0ef42c672b1fe16016147bb4ebc1b29a2c",
+            "a11yPatternDisplayId": "A11Y-PAT-944A9E5FA4E6",
+            "a11yOccurrenceFingerprint": "e305e7e0d37e199d7da9ff60e42ecf1885ba702a0a20a4b66dfa04ec47185011",
+            "a11yOccurrenceDisplayId": "A11Y-OCC-E305E7E0D37E"
+          }
+        ]
+      }
+    },
+    {
+      "submittedUrl": "https://www.drupalasheville.com/events/2026/schedule",
+      "finalUrl": "https://www.drupalasheville.com/events/2026/schedule",
+      "redirected": false,
+      "statusCode": 200,
+      "ok": true,
+      "contentType": "text/html; charset=UTF-8",
+      "pageTitle": "Schedule | Drupal Asheville",
+      "elapsedMs": 15718,
+      "error": null,
+      "scanContext": {
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "browser": "firefox"
+      },
+      "axe": {
+        "executed": true,
+        "error": null,
+        "counts": {
+          "passed": 457,
+          "failed": 10,
+          "cantTell": 8,
+          "inapplicable": 42
+        },
+        "failedRules": [
+          "color-contrast",
+          "heading-order",
+          "link-name",
+          "region"
+        ],
+        "failures": [
+          {
+            "rule": "link-name",
+            "ruleUrl": "https://dequeuniversity.com/rules/axe/4.12/link-name?application=playwright",
+            "impact": "serious",
+            "wcagSc": [
+              "wcag2a",
+              "wcag244",
+              "wcag412"
+            ],
+            "xpath": ".social-media-link-icon--linkedin",
+            "html": "<a class=\"social-media-link-icon--linkedin\" href=\"https://www.linkedin.com/company/drupal-asheville/\"><span class=\"fab fa-linkedin fa-2x\"></span></a>",
+            "message": "Links must have discernible text",
+            "fixSummary": "Fix all of the following:\n  Element is in tab order and does not have accessible text",
+            "isDuplicate": false,
+            "duplicateOf": null,
+            "fingerprint": "18f9780cb5f7",
+            "patternId": "A11Y-social-links",
+            "a11yPatternFingerprint": "944a9e5fa4e6b527cecb00eb5883ef0ef42c672b1fe16016147bb4ebc1b29a2c",
+            "a11yPatternDisplayId": "A11Y-PAT-944A9E5FA4E6",
+            "a11yOccurrenceFingerprint": "f47b2c019d8e12345da9ff60e42ecf1885ba702a0a20a4b66dfa04ec47185999",
+            "a11yOccurrenceDisplayId": "A11Y-OCC-F47B2C019D8E"
+          }
+        ]
+      }
+    }
+  ]
+}

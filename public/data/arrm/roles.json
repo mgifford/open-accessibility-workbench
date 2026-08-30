@@ -1,0 +1,66 @@
+[
+  {
+    "id": "content",
+    "name": "Content Authoring",
+    "description": "Creates text, alt text, headings, captions, link meaning, page language, and media alternatives.",
+    "canChange": [
+      "Page content and media",
+      "Content structure"
+    ]
+  },
+  {
+    "id": "visual-design",
+    "name": "Visual Design",
+    "description": "Defines color contrast, typography scale, visual layout, focus indicator styling, and iconography.",
+    "canChange": [
+      "CSS/design tokens",
+      "Visual design"
+    ]
+  },
+  {
+    "id": "ux-design",
+    "name": "UX / Interaction Design",
+    "description": "Designs keyboard workflows, landmark layout, form error flows, focus order, and interactive patterns.",
+    "canChange": [
+      "UX/interaction design",
+      "Product/business requirements"
+    ]
+  },
+  {
+    "id": "frontend-dev",
+    "name": "Front-End Development",
+    "description": "Implements semantic HTML, ARIA, CSS layout, DOM hierarchy, keyboard event handling, and focus management.",
+    "canChange": [
+      "HTML/templates/components",
+      "CSS/design tokens",
+      "JavaScript/interactions",
+      "Design systems/components"
+    ]
+  },
+  {
+    "id": "backend-dev",
+    "name": "Back-End Development",
+    "description": "Implements server-side templates, CMS field formatters, database-driven markup, and API responses.",
+    "canChange": [
+      "HTML/templates/components",
+      "CMS configuration"
+    ]
+  },
+  {
+    "id": "qa-testing",
+    "name": "Automated & Manual Testing",
+    "description": "Conducts assistive technology audits, regression testing, automated test suite maintenance, and verification.",
+    "canChange": [
+      "Automated/manual testing"
+    ]
+  },
+  {
+    "id": "product-governance",
+    "name": "Product & Governance",
+    "description": "Prioritizes remediation tasks, allocates engineering capacity, ensures compliance, and manages vendor standards.",
+    "canChange": [
+      "Product/business requirements",
+      "Governance/process"
+    ]
+  }
+]

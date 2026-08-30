@@ -1,0 +1,22 @@
+[
+  {
+    "url": "https://example.gov.sg/home",
+    "pageTitle": "Home | GovTech",
+    "httpStatus": 200,
+    "totalIssues": 3,
+    "issues": [
+      { "issueId": "link-name", "severity": "mustFix" },
+      { "issueId": "color-contrast", "severity": "goodToFix" },
+      { "issueId": "image-alt", "severity": "needsReview" }
+    ]
+  },
+  {
+    "url": "https://example.gov.sg/services",
+    "pageTitle": "Services | GovTech",
+    "httpStatus": 200,
+    "totalIssues": 1,
+    "issues": [
+      { "issueId": "link-name", "severity": "mustFix" }
+    ]
+  }
+]

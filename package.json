@@ -1,0 +1,26 @@
+{
+  "name": "open-accessibility-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn a wall of accessibility findings into a small, role-aware set of explainable remediation tasks with evidence, context, guidance, and validation.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/unit/**/*.test.js",
+    "test:watch": "node --test --watch tests/unit/**/*.test.js",
+    "build:data": "node scripts/build-arrm-data.js && node scripts/build-guidance.js && node scripts/build-rag-index.js"
+  },
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "remediation",
+    "wcag",
+    "arrm",
+    "open-scans",
+    "oobee"
+  ],
+  "author": "Open Accessibility Workbench Contributors",
+  "license": "GPL-3.0-or-later"
+}

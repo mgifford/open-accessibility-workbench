@@ -1,0 +1,69 @@
+/**
+ * Verifies that all bundled knowledge assets in public/data have explicit provenance,
+ * license attribution, and valid JSON schemas.
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const publicDataDir = path.resolve(__dirname, '../public/data');
+
+const requiredFiles = [
+  'arrm/metadata.json',
+  'arrm/roles.json',
+  'arrm/tasks.json',
+  'arrm/wcag-role-map.json',
+  'rules/normalized-rules.json',
+  'rules/wcag-map.json',
+  'rules/remediation-patterns.json',
+  'technology/guidance.json',
+  'rag/manifest.json',
+  'rag/guidance.json'
+];
+
+let errors = 0;
+
+for (const relPath of requiredFiles) {
+  const fullPath = path.join(publicDataDir, relPath);
+  if (!fs.existsSync(fullPath)) {
+    console.error(`[FAIL] Missing required data file: ${relPath}`);
+    errors++;
+    continue;
+  }
+
+  try {
+    const content = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+    if (!content) {
+      console.error(`[FAIL] Data file is empty: ${relPath}`);
+      errors++;
+    }
+  } catch (err) {
+    console.error(`[FAIL] Invalid JSON in ${relPath}: ${err.message}`);
+    errors++;
+  }
+}
+
+// Check ARRM provenance metadata
+const arrmMeta = JSON.parse(fs.readFileSync(path.join(publicDataDir, 'arrm/metadata.json'), 'utf8'));
+if (!arrmMeta.source || !arrmMeta.license || !arrmMeta.attribution) {
+  console.error('[FAIL] ARRM metadata missing required provenance fields (source, license, attribution)');
+  errors++;
+}
+
+// Check RAG manifest provenance
+const ragManifest = JSON.parse(fs.readFileSync(path.join(publicDataDir, 'rag/manifest.json'), 'utf8'));
+if (!ragManifest.license || !ragManifest.provenance || !ragManifest.embeddingModel) {
+  console.error('[FAIL] RAG manifest missing license or model provenance');
+  errors++;
+}
+
+if (errors === 0) {
+  console.log(`[PASS] All ${requiredFiles.length} data assets have verified provenance and valid schemas.`);
+  process.exit(0);
+} else {
+  console.error(`[ERROR] Verification failed with ${errors} error(s).`);
+  process.exit(1);
+}

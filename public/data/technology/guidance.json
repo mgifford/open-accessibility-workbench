@@ -1,0 +1,39 @@
+{
+  "drupal": {
+    "name": "Drupal",
+    "category": "CMS",
+    "templateLanguage": "Twig",
+    "remediationContext": "In Drupal, markup is typically rendered via Twig template files (*.html.twig) in custom themes or modules, or through CMS View display modes and Block configurations.",
+    "examples": {
+      "link-name": "{# In links.html.twig #}\n<a href=\"{{ item.url }}\" class=\"social-link\" aria-label=\"{{ item.title }}\">\n  <span class=\"icon-{{ item.icon }}\" aria-hidden=\"true\"></span>\n</a>",
+      "image-alt": "{# In media--image.html.twig #}\n<img src=\"{{ media_url }}\" alt=\"{{ content.field_media_image.0['#item'].alt }}\" />"
+    }
+  },
+  "wordpress": {
+    "name": "WordPress",
+    "category": "CMS",
+    "templateLanguage": "PHP",
+    "remediationContext": "In WordPress, components are defined in theme PHP templates, block patterns, or theme.json design tokens.",
+    "examples": {
+      "link-name": "<?php // In template-parts/social-nav.php ?>\n<a href=\"<?php echo esc_url($link); ?>\" class=\"social-icon\" aria-label=\"<?php echo esc_attr($label); ?>\">\n  <span class=\"dashicons dashicons-twitter\" aria-hidden=\"true\"></span>\n</a>"
+    }
+  },
+  "react": {
+    "name": "React",
+    "category": "Frontend Framework",
+    "templateLanguage": "JSX",
+    "remediationContext": "In React, components are implemented as JSX functions with props and design system component libraries.",
+    "examples": {
+      "link-name": "export function SocialLink({ href, label, icon: Icon }) {\n  return (\n    <a href={href} aria-label={label} className=\"social-link\">\n      <Icon aria-hidden=\"true\" />\n    </a>\n  );\n}"
+    }
+  },
+  "html": {
+    "name": "Native HTML / CSS",
+    "category": "Standards",
+    "templateLanguage": "HTML",
+    "remediationContext": "Standard semantic HTML5 markup and modern CSS custom properties.",
+    "examples": {
+      "link-name": "<a href=\"https://example.com\" class=\"social-link\" aria-label=\"Organization Profile on LinkedIn\">\n  <span class=\"fab fa-linkedin\" aria-hidden=\"true\"></span>\n</a>"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "totalPagesScanned": 2,
+  "pagesScanned": [
+    { "url": "https://example.gov.sg/home", "pageTitle": "Home | GovTech", "issuesCount": 3 },
+    { "url": "https://example.gov.sg/services", "pageTitle": "Services | GovTech", "issuesCount": 1 }
+  ],
+  "pagesNotScanned": []
+}

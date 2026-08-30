@@ -1,0 +1,38 @@
+{
+  "generatedAt": "2026-08-20T17:07:27.610Z",
+  "issueNumber": 347,
+  "scanTitle": "Drupal Camp Asheville",
+  "scannersInUse": [
+    "axe",
+    "qualweb"
+  ],
+  "scannerStats": {
+    "axe": {
+      "label": "axe",
+      "failed": 34,
+      "uniqueFailed": 34,
+      "duplicates": 0
+    },
+    "qualweb": {
+      "label": "QualWeb",
+      "failed": 19,
+      "uniqueFailed": 19,
+      "duplicates": 0
+    }
+  },
+  "matrix": {
+    "axe": {
+      "axe": 34,
+      "qualweb": 0
+    },
+    "qualweb": {
+      "axe": 0,
+      "qualweb": 4
+    }
+  },
+  "duplicateFindingTotals": 15,
+  "overlapEntryCount": 0,
+  "overlapEntries": [],
+  "actConsensusEntryCount": 0,
+  "actConsensusEntries": []
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "issueId": "link-name",
+    "issueDescription": "Links must have discernible text",
+    "severity": "mustFix",
+    "pagesCount": 2,
+    "occurrences": 2
+  },
+  {
+    "issueId": "color-contrast",
+    "issueDescription": "Elements must meet minimum color contrast ratio thresholds",
+    "severity": "goodToFix",
+    "pagesCount": 1,
+    "occurrences": 1
+  },
+  {
+    "issueId": "image-alt",
+    "issueDescription": "Images must have alternate text",
+    "severity": "needsReview",
+    "pagesCount": 1,
+    "occurrences": 1
+  }
+]
