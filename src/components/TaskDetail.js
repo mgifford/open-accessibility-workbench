@@ -1,7 +1,7 @@
 import { workspaceStore } from '../state/workspace.js';
 import { formatGitHubIssue } from '../export/github-issue.js';
 import { runValidationSuite } from '../validation/registry.js';
-import { requestAiRemediation } from '../ai/client.js';
+import '../components/AiAdvisor.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 import { renderRoleGuidance as renderRoleGuidanceDetail } from '../roles/render-role-guidance.js';
 import { profileStore } from '../state/profile.js';
@@ -165,15 +165,14 @@ export class TaskDetail extends HTMLElement {
             </ol>
           </div>
 
-          <!-- Action Buttons / Handoff -->
+          <!-- Action Buttons -->
           <div style="display: flex; gap: var(--space-3); flex-wrap: wrap; border-top: 1px solid var(--color-border); padding-top: var(--space-4);">
             <button type="button" class="btn btn-secondary" id="copy-markdown-btn">Copy Task Markdown</button>
             <button type="button" class="btn btn-secondary" id="copy-github-btn">Copy GitHub Issue</button>
-            ${FEATURES.aiAdvisor ? `<button type="button" class="btn btn-primary" id="ai-advisor-btn">Get Local AI Candidate</button>` : ''}
           </div>
 
-          <!-- AI Advisor Panel (Dynamic) — only when the AI feature is enabled -->
-          ${FEATURES.aiAdvisor ? '<div id="ai-panel" style="margin-top: var(--space-6); display: none;"></div>' : ''}
+          <!-- Optional local-AI advisor (consent-gated; deterministic guidance above always applies) -->
+          ${FEATURES.aiAdvisor ? '<div style="margin-top: var(--space-6);"><ai-advisor id="task-ai-advisor"></ai-advisor></div>' : ''}
 
           <!-- Prepare handoff (works with AI disabled) -->
           <div style="margin-top: var(--space-6);">
@@ -196,8 +195,6 @@ export class TaskDetail extends HTMLElement {
   setupListeners(task) {
     const copyMdBtn = this.querySelector('#copy-markdown-btn');
     const copyGhBtn = this.querySelector('#copy-github-btn');
-    const aiBtn = this.querySelector('#ai-advisor-btn');
-    const aiPanel = this.querySelector('#ai-panel');
 
     if (copyMdBtn) {
       copyMdBtn.addEventListener('click', async () => {
@@ -216,39 +213,10 @@ export class TaskDetail extends HTMLElement {
         setTimeout(() => copyGhBtn.textContent = 'Copy GitHub Issue', 2000);
       });
     }
-
-    if (aiBtn) {
-      aiBtn.addEventListener('click', async () => {
-        aiPanel.style.display = 'block';
-        aiPanel.innerHTML = `
-          <div class="card" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-primary);">
-            <h4 style="font-weight: 700; color: var(--color-brand-primary); margin-bottom: var(--space-2);">Local AI Remediation Advisor</h4>
-            <p style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-bottom: var(--space-4);">
-              Runs 100% locally in your browser. Scanner evidence is strictly isolated as untrusted data.
-            </p>
-            <div id="ai-status">Running deterministic validation loop with local advisor...</div>
-          </div>
-        `;
-
-        try {
-          const result = await requestAiRemediation(task, 'HuggingFaceTB/SmolLM2-135M-Instruct', this.sourceCodeContext);
-          aiPanel.innerHTML = `
-            <div class="card" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-primary);">
-              <h4 style="font-weight: 700; color: var(--color-brand-primary); margin-bottom: var(--space-2);">Local AI Remediation Candidate</h4>
-              <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">
-                <strong>Strategy:</strong> ${escapeHtml(result.recommendedStrategy)}
-              </p>
-              <pre class="code-block" style="margin-bottom: var(--space-3);"><code>${escapeHtml(result.targetMarkup || result.sourceAwareCandidate || '')}</code></pre>
-              <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary);">
-                <strong>Validation Status:</strong> ${escapeHtml(result.validationResult?.status || 'Passed')} (Completed in ${escapeHtml(result.attempts)} attempts)
-              </div>
-            </div>
-          `;
-        } catch (err) {
-          aiPanel.innerHTML = `<div class="card" style="color: var(--color-urgency-critical);">AI Advisor Error: ${escapeHtml(err.message)}</div>`;
-        }
-      });
-    }
+    // The optional AI advisor is a self-contained, consent-gated component
+    // (<ai-advisor>); the task-detail view wires nothing else for it.
+    const advisor = this.querySelector('#task-ai-advisor');
+    if (advisor) advisor.task = task;
   }
 }
 

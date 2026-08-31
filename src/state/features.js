@@ -5,6 +5,8 @@
  * false in the shipped build.
  */
 export const FEATURES = {
-  // Set true only once Phase 11 (model consent + worker + validation loop) lands.
-  aiAdvisor: false
+  // Phase 11: the local-AI advisor is now consent-gated (no download on load,
+  // explicit enable required, deterministic fallback everywhere), so the
+  // consent-first panel may be shown. It stays entirely optional.
+  aiAdvisor: true
 };

@@ -18,12 +18,16 @@ export function exportTasksToJson(workspaceData, options = {}) {
   const exportObj = {
     workbenchVersion: '0.1.0',
     generatedAt: new Date().toISOString(),
-    aiProvenance: {
-      generatedByAI: Boolean(aiProvenance.generatedByAI),
+    aiProvenance: aiProvenance.generatedByAI ? {
+      generatedByAI: true,
       model: aiProvenance.model || null,
-      runtime: aiProvenance.runtime || null,
-      validation: aiProvenance.validation || null
-    },
+      modelRevision: aiProvenance.modelRevision || null,
+      runtime: aiProvenance.runtime || 'transformers.js',
+      device: aiProvenance.device || null,
+      guidanceSources: aiProvenance.guidanceSources || [],
+      validation: aiProvenance.validation || {},
+      generatedAt: aiProvenance.generatedAt || null
+    } : { generatedByAI: false },
     summary: {
       totalObservations: observations.length,
       totalTasks: tasks.length,
