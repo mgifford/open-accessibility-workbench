@@ -35,7 +35,7 @@ const routes = {
           <li>100% Client-Side Processing (Zero network upload of report files).</li>
           <li>Deterministic Analysis Baseline (Works completely offline without AI models).</li>
           <li>W3C ARRM Multi-Disciplinary Role Routing.</li>
-          <li>Full Data Provenance and Lossless Aggregate Traceability.</li>
+          <li>Full Data Provenance: every aggregate task traces back to its scanner evidence.</li>
         </ul>
       </div>
     </section>
