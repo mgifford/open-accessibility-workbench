@@ -27,15 +27,21 @@ export function buildSourceAwareCandidate(sourceContext, task) {
   if (snippet === '') return null;
 
   const bp = task?.blueprint || {};
+  // No deterministic source transformation exists yet, so this is honestly the
+  // SUPPLIED source plus the remediation objective — not a generated candidate.
+  // (Renaming it "Candidate source change" would overclaim.) A real transform is
+  // a later-phase deliverable; until then we present the objective against the
+  // user's own source so they can apply the change themselves.
   return {
-    label: 'Candidate source change',
+    label: 'Supplied source context',
     framework: sourceContext.framework || null,
     language: sourceContext.language || null,
     filename: sourceContext.filename || null,
     componentName: sourceContext.componentName || null,
     basedOnSuppliedSource: true,
+    transformed: false,
     objective: bp.whatNeedsToChange || 'Satisfy the accessibility requirement for this rule.',
-    note: 'Generated from the source you supplied. Review before applying; it is a candidate, not a verified patch, and does not replace the human decisions listed for this task.',
+    note: 'This is the source you supplied plus the remediation objective. The Workbench does not yet generate a transformed candidate; apply the objective to this source yourself, then validate.',
     suppliedSnippet: snippet,
     surroundingContext: typeof sourceContext.surroundingContext === 'string' ? sourceContext.surroundingContext : null
   };

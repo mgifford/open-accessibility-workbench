@@ -95,7 +95,9 @@ describe('Phase 9 MVP gate: full deterministic workflow with AI disabled', () =>
     // With a real snippet -> a labelled candidate that references the SUPPLIED source.
     const cand = buildSourceAwareCandidate({ framework: 'Drupal', filename: 'social.twig', snippet: '<a>{{ link }}</a>' }, task);
     assert.ok(cand);
-    assert.equal(cand.label, 'Candidate source change');
+    // Honestly labelled: no deterministic transform exists yet.
+    assert.equal(cand.label, 'Supplied source context');
+    assert.equal(cand.transformed, false);
     assert.equal(cand.basedOnSuppliedSource, true);
     assert.match(cand.suppliedSnippet, /link/);
   });
@@ -138,5 +140,62 @@ describe('Phase 9 MVP gate: full deterministic workflow with AI disabled', () =>
       exportTasksToJsonLd(ws);
       exportTasksToJson(ws);
     });
+  });
+});
+
+import { generateRemediationBlueprint } from '../../src/guidance/remediation.js';
+import { routeTaskForProfile } from '../../src/roles/route-task.js';
+
+describe('Phase 9 hardening: no invented content; honest validation & handoff', () => {
+  const RULES = ['link-name', 'color-contrast', 'image-alt', 'region'];
+
+  test('blueprints never invent names, alt text, labels, or colours', () => {
+    for (const rule of RULES) {
+      const bp = generateRemediationBlueprint({ ruleId: rule, cluster: { pagesCount: 1, occurrencesCount: 1 }, technologyContext: null });
+      const tm = bp.targetMarkup || '';
+      // Unresolved values are placeholders, not fabricated content.
+      if (rule !== 'region') assert.ok(tm.includes('{{'), `${rule} target markup should use {{ }} placeholders`);
+      // No invented specifics from the prior version.
+      assert.ok(!/Visit our profile|LinkedIn|Conference attendees|#d44d10/i.test(tm), `${rule} must not contain invented values`);
+      // No hardcoded hex colour presented as an accessible answer.
+      assert.ok(!/#[0-9a-f]{6}/i.test(tm), `${rule} must not hardcode a colour`);
+    }
+  });
+
+  test('handoff routing agrees with the Phase 7 capability router', () => {
+    const bp = generateRemediationBlueprint({ ruleId: 'link-name', cluster: {}, remediationFamily: 'accessible-name', technologyContext: null });
+    const task = { id: 'T', title: 'x', ruleId: 'link-name', remediationFamily: 'accessible-name',
+      roles: { primary: 'Content Authoring', coPrimary: ['Front-End Development'], secondary: [], contributors: [] },
+      blueprint: bp, representativeLocator: '.a', representativeHtml: '<a></a>', metrics: { observationCount: 1 }, affectedPages: [], observations: [] };
+    const caps = ['Page content and media', 'HTML/templates/components'];
+    const route = routeTaskForProfile(task, caps);
+    const handoff = buildHandoff(task, caps);
+    assert.equal(handoff.relevance, route.relevance);
+    // The reviewer's scenario: this user is NOT told they cannot handle the task.
+    assert.notEqual(handoff.relevance, 'handoff');
+    assert.ok(!/do not cover this task/i.test(handoff.whyHandoff));
+  });
+
+  test('handoff Markdown includes affected page URLs and resolvable source pointers', () => {
+    const task = { id: 'T', title: 'x', ruleId: 'link-name',
+      roles: { primary: 'Content Authoring' }, blueprint: generateRemediationBlueprint({ ruleId: 'link-name', cluster: {}, technologyContext: null }),
+      representativeLocator: '.a', representativeHtml: '<a></a>', metrics: { observationCount: 2 },
+      affectedPages: ['https://example.test/home', 'https://example.test/about'],
+      observations: [{ source: { sourceReportId: 'R1', originalRef: 'report.json', recordPointer: '/results/0/axe/failures/1' }, provenance: { scanner: 'axe' }, page: { submittedUrl: 'https://example.test/home' } }] };
+    const md = handoffToMarkdown(buildHandoff(task, []));
+    assert.match(md, /example\.test\/home/);
+    assert.match(md, /example\.test\/about/);
+    assert.match(md, /R1/);
+    assert.match(md, /\/results\/0\/axe\/failures\/1/);
+  });
+
+  test('curated guidance provenance appears in Markdown and JSON-LD exports', () => {
+    const bp = generateRemediationBlueprint({ ruleId: 'link-name', cluster: {}, technologyContext: null });
+    const task = { id: 'T', title: 'x', ruleId: 'link-name', wcag: ['2.4.4'], urgency: 'high', leverage: 'high', metrics: {}, roles: {}, blueprint: bp, affectedPages: [], observations: [] };
+    const md = exportTasksToMarkdown({ tasks: [task], observations: [], sourceSummary: {} });
+    assert.match(md, /Curated Guidance/);
+    assert.match(md, /Source:/);
+    const ld = JSON.parse(exportTasksToJsonLd({ tasks: [task], observations: [], sourceSummary: {} }));
+    assert.ok(ld.remediationTasks[0].actionableBlueprint.curatedGuidance.provenance);
   });
 });

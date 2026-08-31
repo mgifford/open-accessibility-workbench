@@ -46,6 +46,16 @@ export function exportTasksToMarkdown(workspaceData) {
     lines.push(`#### What Needs to Change`);
     lines.push(task.blueprint.whatNeedsToChange);
     lines.push(``);
+    const rg = task.blueprint.ruleGuidance;
+    if (rg) {
+      lines.push(`#### Curated Guidance`);
+      lines.push(rg.summary);
+      if (rg.implementation?.length) { lines.push(`- Implementation: ${rg.implementation.join(' ')}`); }
+      if (rg.verification?.length) { lines.push(`- Verification: ${rg.verification.join(' ')}`); }
+      const p = rg.provenance || {};
+      lines.push(`_Source: ${p.source || 'Workbench'}${p.sourceUrl ? ` (${p.sourceUrl})` : ''}${p.revision ? `, rev ${p.revision}` : ''}${p.license ? `, ${p.license}` : ''}._`);
+      lines.push(``);
+    }
     if (task.blueprint.humanDecisionsRequired?.length) {
       lines.push(`#### Human Decisions Required`);
       for (const dec of task.blueprint.humanDecisionsRequired) {

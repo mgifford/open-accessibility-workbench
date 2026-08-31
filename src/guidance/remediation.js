@@ -45,55 +45,61 @@ export function generateRemediationBlueprint(taskMeta) {
     'Re-run automated accessibility scans.'
   ];
 
+  // Target markup is a STRUCTURAL PATTERN with explicit placeholders for every
+  // value a human must decide. It never invents accessible names, alt text,
+  // labels, colours, or design-token architecture (spec §3.5). Placeholders are
+  // written in {{ }} so they are obviously unresolved, not a finished fix.
   if (ruleId === 'link-name') {
     problem = 'Links do not have discernible, accessible text communicating their destination.';
-    whatNeedsToChange = 'Provide accessible text for the link using visible text or an aria-label attribute.';
+    whatNeedsToChange = 'Provide an accessible name for the link. Prefer visible text; for an icon-only link, add visually-hidden text or an accessible name.';
     humanDecisionsRequired = [
-      'Confirm the human-readable destination name for each link (e.g. "Visit Drupal Asheville on LinkedIn").',
-      'Determine whether to use visually hidden text (.sr-only) or aria-label.'
+      'Determine the human-readable purpose/destination of each link (a content decision).',
+      'Decide whether to use visible text, visually-hidden text, or an accessible name.'
     ];
-    targetMarkup = `<a href="..." class="social-link" aria-label="Visit our profile on LinkedIn">\n  <span class="icon-linkedin" aria-hidden="true"></span>\n</a>`;
+    targetMarkup = `<!-- Pattern (fill in the human-decided values):\n     Option A — visible text:  <a href="{{ href }}">{{ link purpose }}</a>\n     Option B — icon-only:     <a href="{{ href }}"><span aria-hidden="true">{{ icon }}</span><span class="visually-hidden">{{ link purpose }}</span></a> -->`;
     verificationSteps = [
-      'Inspect the computed accessible name in the browser DevTools Accessibility tab.',
-      'Tab to the link and verify the screen reader announces the link purpose clearly.',
-      'Re-run automated axe check to verify link-name passes.'
+      'Inspect the computed accessible name in the browser accessibility tree.',
+      'Tab to the link and verify a screen reader announces its purpose.',
+      'Re-run the automated link-name rule.'
     ];
   } else if (ruleId === 'color-contrast') {
     problem = 'Elements have insufficient color contrast between text and background.';
-    whatNeedsToChange = 'Adjust the text color or background color token in the theme stylesheet to meet the minimum 4.5:1 ratio.';
+    whatNeedsToChange = 'Change the text or background colour (ideally a design token) to meet the required ratio (4.5:1 normal text, 3:1 large text). The specific accessible colour is a design decision.';
     humanDecisionsRequired = [
-      'Consult with Visual Design to select an approved brand color palette token that achieves at least 4.5:1 contrast.',
-      'Confirm if font size/weight can be adjusted if 3:1 ratio is preferred for large text.'
+      'Choose an approved accessible colour/token that meets the ratio (a Visual Design decision — the Workbench does not choose the colour).',
+      'Decide whether the affected text qualifies as large text (3:1) or normal text (4.5:1).'
     ];
-    targetMarkup = `/* In theme stylesheet / design tokens */\n:root {\n  --color-brand-primary: #d44d10; /* Adjusted for 4.5:1 contrast against white */\n}`;
+    targetMarkup = `/* Pattern — set the token to a colour Visual Design confirms meets the ratio: */\n:root {\n  --color-foreground: {{ accessible colour, ratio >= 4.5:1 against its background }};\n}`;
     verificationSteps = [
-      'Inspect contrast ratio using browser DevTools color picker.',
-      'Verify readability in operating system High Contrast / Forced Colors mode.',
-      'Re-run automated color-contrast check.'
+      'Measure the chosen colours with a contrast tool or DevTools.',
+      'Verify readability in forced-colors / high-contrast mode.',
+      'Re-run the automated color-contrast rule.'
     ];
   } else if (ruleId === 'image-alt') {
-    problem = 'Images missing alt attribute prevent non-sighted users from understanding image content.';
-    whatNeedsToChange = 'Add an appropriate alt attribute to every <img> element.';
+    problem = 'Images lack a text alternative, so non-sighted users cannot understand their content.';
+    whatNeedsToChange = 'Provide a text alternative appropriate to each image: descriptive alt for informative images, empty alt for decorative images.';
     humanDecisionsRequired = [
-      'Determine whether the image is informative (requires descriptive alt text) or decorative (requires alt="").'
+      'Determine whether each image is informative or decorative.',
+      'For informative images, decide what the alternative should convey (a content decision — the Workbench does not write alt text).'
     ];
-    targetMarkup = `<img src="/assets/photo.jpg" alt="Conference attendees gathered at the opening keynote" />`;
+    targetMarkup = `<!-- Informative: --> <img src="{{ src }}" alt="{{ what the image conveys }}" />\n<!-- Decorative: --> <img src="{{ src }}" alt="" />`;
     verificationSteps = [
-      'Verify presence of alt attribute on <img> in DOM.',
-      'Verify screen reader reads the alternative text or skips decorative image.',
-      'Re-run automated image-alt check.'
+      'Confirm the alt attribute is present and appropriate to the image’s purpose.',
+      'Verify a screen reader announces informative images and skips decorative ones.',
+      'Re-run the automated image-alt rule.'
     ];
   } else if (ruleId === 'region') {
     problem = 'Content is not contained within landmark regions.';
-    whatNeedsToChange = 'Wrap major page areas in semantic HTML5 elements (<header>, <nav>, <main>, <footer>).';
+    whatNeedsToChange = 'Wrap major page areas in semantic HTML5 landmarks (<header>, <nav>, <main>, <footer>).';
     humanDecisionsRequired = [
-      'Confirm primary page content boundaries for <main>.',
-      'Ensure each <nav> landmark has a distinguishing aria-label if multiple navigation menus exist.'
+      'Confirm the primary content boundary for <main>.',
+      'If more than one navigation region exists, decide a distinguishing label for each (a structure decision).'
     ];
-    targetMarkup = `<header>...</header>\n<nav aria-label="Main Navigation">...</nav>\n<main>\n  <!-- Primary page content -->\n</main>\n<footer>...</footer>`;
+    targetMarkup = `<header>{{ site header }}</header>\n<nav aria-label="{{ label if multiple navs }}">{{ navigation }}</nav>\n<main>{{ primary page content }}</main>\n<footer>{{ site footer }}</footer>`;
     verificationSteps = [
-      'Verify landmark navigation shortcuts in screen reader.',
-      'Confirm exactly one <main> element per page.'
+      'Confirm exactly one <main> element per page.',
+      'Navigate by landmark with a screen reader.',
+      'Re-run the automated region rule.'
     ];
   }
 

@@ -5,6 +5,7 @@ import { requestAiRemediation } from '../ai/client.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 import { renderRoleGuidance as renderRoleGuidanceDetail } from '../roles/render-role-guidance.js';
 import { profileStore } from '../state/profile.js';
+import { FEATURES } from '../state/features.js';
 import '../components/HandoffBuilder.js';
 
 export class TaskDetail extends HTMLElement {
@@ -49,10 +50,16 @@ export class TaskDetail extends HTMLElement {
       return;
     }
 
-    // Run deterministic validation on the target markup
-    const staticValidation = runValidationSuite(task.ruleId, task.blueprint.targetMarkup || '', {
-      originalSnippet: task.representativeHtml
-    });
+    // Deterministic validation runs ONLY against real evidence (the reported
+    // markup) or a real supplied candidate — never against the generic
+    // placeholder pattern in targetMarkup (which contains unresolved {{ }}
+    // values and would produce a meaningless "pass").
+    const candidate = task.blueprint?.sourceAwareCandidate?.suppliedSnippet || null;
+    const validationTarget = candidate || task.representativeHtml || '';
+    const staticValidation = validationTarget
+      ? runValidationSuite(task.ruleId, validationTarget, { originalSnippet: task.representativeHtml })
+      : { passed: false, status: 'No evidence or supplied candidate to validate against.' };
+    const validationScope = candidate ? 'supplied candidate' : (task.representativeHtml ? 'reported page markup' : 'none');
 
     this.innerHTML = `
       <section>
@@ -112,6 +119,9 @@ export class TaskDetail extends HTMLElement {
             </div>
           ` : ''}
 
+          <!-- Curated rule guidance with provenance (spec §9.1) -->
+          ${renderRuleGuidance(task.blueprint?.ruleGuidance)}
+
           <!-- Retrieved Guidance (deterministic order; every item shows provenance + reason) -->
           ${renderRetrievedGuidance(task.blueprint?.retrievedGuidance)}
 
@@ -127,19 +137,22 @@ export class TaskDetail extends HTMLElement {
             <pre class="code-block"><code>${escapeHtml(task.representativeHtml)}</code></pre>
           </div>
 
-          <!-- Target Markup & Deterministic Guidance -->
+          <!-- Remediation pattern (structural placeholders — NOT a finished fix) -->
           ${task.blueprint.targetMarkup ? `
             <div style="margin-bottom: var(--space-6);">
-              <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Deterministic Remediation Guidance</h3>
+              <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Remediation Pattern</h3>
               <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">${escapeHtml(task.blueprint.whatNeedsToChange)}</p>
+              <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-bottom: var(--space-2);">This is a framework-neutral pattern. Values in <code>{{ }}</code> are human decisions — the Workbench does not invent names, alt text, labels, or colours.</p>
               <pre class="code-block" style="margin-bottom: var(--space-3);"><code>${escapeHtml(task.blueprint.targetMarkup)}</code></pre>
 
-              <!-- Validation status -->
+              <!-- Validation status: run only against real evidence/candidate -->
               <div style="background-color: var(--color-bg-subtle); padding: var(--space-3); border-radius: var(--radius-sm); font-size: var(--font-size-xs);">
-                <strong>Static Validation:</strong>
-                <span style="color: ${staticValidation.passed ? 'var(--color-urgency-low)' : 'var(--color-urgency-critical)'}; font-weight: 600; margin-left: var(--space-1);">
-                  ${staticValidation.status}
+                <strong>Static Validation</strong>
+                <span style="color: var(--color-text-muted);"> (against ${escapeHtml(validationScope)}):</span>
+                <span style="color: ${staticValidation.passed ? 'var(--color-urgency-low)' : 'var(--color-text-primary)'}; font-weight: 600; margin-left: var(--space-1);">
+                  ${escapeHtml(staticValidation.status)}
                 </span>
+                <div style="color: var(--color-text-muted); margin-top: var(--space-1);">The pattern above is not validated against the reported page or source; validation runs only against actual evidence or a supplied candidate.</div>
               </div>
             </div>
           ` : ''}
@@ -156,11 +169,11 @@ export class TaskDetail extends HTMLElement {
           <div style="display: flex; gap: var(--space-3); flex-wrap: wrap; border-top: 1px solid var(--color-border); padding-top: var(--space-4);">
             <button type="button" class="btn btn-secondary" id="copy-markdown-btn">Copy Task Markdown</button>
             <button type="button" class="btn btn-secondary" id="copy-github-btn">Copy GitHub Issue</button>
-            <button type="button" class="btn btn-primary" id="ai-advisor-btn">Get Local AI Candidate</button>
+            ${FEATURES.aiAdvisor ? `<button type="button" class="btn btn-primary" id="ai-advisor-btn">Get Local AI Candidate</button>` : ''}
           </div>
 
-          <!-- AI Advisor Panel (Dynamic) -->
-          <div id="ai-panel" style="margin-top: var(--space-6); display: none;"></div>
+          <!-- AI Advisor Panel (Dynamic) — only when the AI feature is enabled -->
+          ${FEATURES.aiAdvisor ? '<div id="ai-panel" style="margin-top: var(--space-6); display: none;"></div>' : ''}
 
           <!-- Prepare handoff (works with AI disabled) -->
           <div style="margin-top: var(--space-6);">
@@ -250,6 +263,27 @@ export class TaskDetail extends HTMLElement {
  * distinct from the task's own remediation blueprint — and never silently
  * becomes the recommendation.
  */
+/** Renders curated rule guidance (decisions/implementation/verification) with provenance. */
+function renderRuleGuidance(g) {
+  if (!g) return '';
+  const list = (arr) => (arr || []).map(x => `<li>${escapeHtml(x)}</li>`).join('');
+  const p = g.provenance || {};
+  return `
+    <div style="margin-bottom: var(--space-6);">
+      <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Curated Guidance</h3>
+      <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">${escapeHtml(g.summary)}</p>
+      ${g.decisions?.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; margin-top: var(--space-2);">Decisions</p><ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${list(g.decisions)}</ul>` : ''}
+      ${g.implementation?.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; margin-top: var(--space-2);">Implementation</p><ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${list(g.implementation)}</ul>` : ''}
+      ${g.verification?.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; margin-top: var(--space-2);">Verification</p><ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${list(g.verification)}</ul>` : ''}
+      <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">
+        ${g.curated ? 'Curated Workbench guidance' : 'Generic Workbench guidance'} &bull;
+        Source: ${p.sourceUrl ? `<a href="${escapeAttr(p.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.source)}</a>` : escapeHtml(p.source || 'Workbench')}
+        ${p.revision ? ` &bull; rev ${escapeHtml(p.revision)}` : ''} ${p.license ? ` &bull; ${escapeHtml(p.license)}` : ''}
+      </div>
+    </div>
+  `;
+}
+
 function renderRetrievedGuidance(items) {
   if (!Array.isArray(items) || items.length === 0) return '';
   return `

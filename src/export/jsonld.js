@@ -59,7 +59,19 @@ export function exportTasksToJsonLd(workspaceData) {
         problemStatement: t.blueprint.problem,
         rootCause: t.blueprint.likelyRootCause,
         remediationSummary: t.blueprint.whatNeedsToChange,
+        curatedGuidance: t.blueprint.ruleGuidance ? {
+          summary: t.blueprint.ruleGuidance.summary,
+          decisions: t.blueprint.ruleGuidance.decisions,
+          implementation: t.blueprint.ruleGuidance.implementation,
+          verification: t.blueprint.ruleGuidance.verification,
+          provenance: t.blueprint.ruleGuidance.provenance
+        } : null,
+        retrievedGuidance: (t.blueprint.retrievedGuidance || []).map(r => ({
+          title: r.title, source: r.source, sourceUrl: r.sourceUrl, license: r.license,
+          framework: r.framework, matchType: r.matchType, retrievalReason: r.retrievalReason
+        })),
         technologyGuidance: t.blueprint.technologyGuidance || null,
+        humanDecisions: t.blueprint.humanDecisions || null,
         humanDecisionsRequired: t.blueprint.humanDecisionsRequired,
         verificationSteps: t.blueprint.verificationSteps
       }
