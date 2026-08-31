@@ -1,23 +1,34 @@
-[
-  {
-    "issueId": "link-name",
-    "issueDescription": "Links must have discernible text",
-    "severity": "mustFix",
-    "pagesCount": 2,
-    "occurrences": 2
-  },
-  {
-    "issueId": "color-contrast",
-    "issueDescription": "Elements must meet minimum color contrast ratio thresholds",
-    "severity": "goodToFix",
-    "pagesCount": 1,
-    "occurrences": 1
-  },
-  {
-    "issueId": "image-alt",
-    "issueDescription": "Images must have alternate text",
-    "severity": "needsReview",
-    "pagesCount": 1,
-    "occurrences": 1
-  }
-]
+{
+  "oobeeAppVersion": "0.10.0",
+  "mustFix": [
+    {
+      "rule": "link-name",
+      "description": "Links must have discernible text",
+      "axeImpact": "serious",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.4/link-name",
+      "conformance": ["wcag2a", "wcag244", "wcag412"],
+      "totalItems": 2
+    }
+  ],
+  "goodToFix": [
+    {
+      "rule": "color-contrast-enhanced",
+      "description": "Elements must meet enhanced color contrast ratio thresholds",
+      "axeImpact": "serious",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.4/color-contrast-enhanced",
+      "conformance": ["wcag2aaa", "wcag146"],
+      "totalItems": 1
+    }
+  ],
+  "needsReview": [
+    {
+      "rule": "image-alt",
+      "description": "Images must have alternate text",
+      "axeImpact": "moderate",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.4/image-alt",
+      "conformance": ["wcag2a", "wcag111"],
+      "totalItems": 1
+    }
+  ],
+  "passed": []
+}

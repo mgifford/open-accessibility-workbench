@@ -1,22 +1,59 @@
-[
-  {
-    "url": "https://example.gov.sg/home",
-    "pageTitle": "Home | GovTech",
-    "httpStatus": 200,
-    "totalIssues": 3,
-    "issues": [
-      { "issueId": "link-name", "severity": "mustFix" },
-      { "issueId": "color-contrast", "severity": "goodToFix" },
-      { "issueId": "image-alt", "severity": "needsReview" }
-    ]
-  },
-  {
-    "url": "https://example.gov.sg/services",
-    "pageTitle": "Services | GovTech",
-    "httpStatus": 200,
-    "totalIssues": 1,
-    "issues": [
-      { "issueId": "link-name", "severity": "mustFix" }
-    ]
-  }
-]
+{
+  "oobeeAppVersion": "0.10.0",
+  "pagesAffected": [
+    {
+      "url": "https://example.gov.sg/home",
+      "pageTitle": "Home | GovTech",
+      "totalOccurrencesFailedIncludingNeedsReview": 3,
+      "occurrencesMustFix": 1,
+      "occurrencesGoodToFix": 1,
+      "occurrencesNeedsReview": 1,
+      "typesOfIssues": [
+        {
+          "ruleId": "link-name",
+          "conformance": ["wcag2a", "wcag244", "wcag412"],
+          "occurrencesMustFix": 1,
+          "occurrencesGoodToFix": 0,
+          "occurrencesNeedsReview": 0
+        },
+        {
+          "ruleId": "color-contrast-enhanced",
+          "conformance": ["wcag2aaa", "wcag146"],
+          "occurrencesMustFix": 0,
+          "occurrencesGoodToFix": 1,
+          "occurrencesNeedsReview": 0
+        },
+        {
+          "ruleId": "image-alt",
+          "conformance": ["wcag2a", "wcag111"],
+          "occurrencesMustFix": 0,
+          "occurrencesGoodToFix": 0,
+          "occurrencesNeedsReview": 1
+        }
+      ],
+      "httpStatusCode": 200
+    },
+    {
+      "url": "https://example.gov.sg/services",
+      "pageTitle": "Services | GovTech",
+      "totalOccurrencesFailedIncludingNeedsReview": 1,
+      "occurrencesMustFix": 1,
+      "occurrencesGoodToFix": 0,
+      "occurrencesNeedsReview": 0,
+      "typesOfIssues": [
+        {
+          "ruleId": "link-name",
+          "conformance": ["wcag2a", "wcag244", "wcag412"],
+          "occurrencesMustFix": 1,
+          "occurrencesGoodToFix": 0,
+          "occurrencesNeedsReview": 0
+        }
+      ],
+      "httpStatusCode": 200
+    }
+  ],
+  "pagesNotAffected": [],
+  "scannedPagesCount": 2,
+  "pagesNotScanned": [],
+  "pagesNotScannedCount": 0
+}

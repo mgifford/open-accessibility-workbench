@@ -1,8 +1,29 @@
 {
-  "totalPagesScanned": 2,
-  "pagesScanned": [
-    { "url": "https://example.gov.sg/home", "pageTitle": "Home | GovTech", "issuesCount": 3 },
-    { "url": "https://example.gov.sg/services", "pageTitle": "Services | GovTech", "issuesCount": 1 }
+  "oobeeAppVersion": "0.10.0",
+  "pagesAffected": [
+    {
+      "url": "https://example.gov.sg/home",
+      "pageTitle": "Home | GovTech",
+      "totalOccurrencesFailedIncludingNeedsReview": 3,
+      "occurrencesMustFix": 1,
+      "occurrencesGoodToFix": 1,
+      "occurrencesNeedsReview": 1,
+      "typesOfIssues": ["link-name", "color-contrast-enhanced", "image-alt"],
+      "httpStatusCode": 200
+    },
+    {
+      "url": "https://example.gov.sg/services",
+      "pageTitle": "Services | GovTech",
+      "totalOccurrencesFailedIncludingNeedsReview": 1,
+      "occurrencesMustFix": 1,
+      "occurrencesGoodToFix": 0,
+      "occurrencesNeedsReview": 0,
+      "typesOfIssues": ["link-name"],
+      "httpStatusCode": 200
+    }
   ],
-  "pagesNotScanned": []
+  "pagesNotAffected": [],
+  "scannedPagesCount": 2,
+  "pagesNotScanned": [],
+  "pagesNotScannedCount": 0
 }

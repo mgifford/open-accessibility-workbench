@@ -1,6 +1,58 @@
 {
-  "mustFix": 2,
-  "goodToFix": 1,
-  "needsReview": 1,
-  "totalItems": 4
+  "oobeeAppVersion": "0.10.0",
+  "mustFix": {
+    "description": "Issues that must be fixed. These correspond to WCAG A and AA success criteria.",
+    "totalItems": 2,
+    "totalRuleIssues": 1,
+    "rules": [
+      {
+        "rule": "link-name",
+        "description": "Links must have discernible text",
+        "axeImpact": "serious",
+        "conformance": ["wcag2a", "wcag244", "wcag412"],
+        "totalItems": 2
+      }
+    ]
+  },
+  "goodToFix": {
+    "description": "Issues that are good to fix. These correspond to WCAG AAA success criteria and best practices.",
+    "totalItems": 1,
+    "totalRuleIssues": 1,
+    "rules": [
+      {
+        "rule": "color-contrast-enhanced",
+        "description": "Elements must meet enhanced color contrast ratio thresholds",
+        "axeImpact": "serious",
+        "conformance": ["wcag2aaa", "wcag146"],
+        "totalItems": 1
+      }
+    ]
+  },
+  "needsReview": {
+    "description": "Occurrences that could potentially be false positives, requiring human validation.",
+    "totalItems": 1,
+    "totalRuleIssues": 1,
+    "rules": [
+      {
+        "rule": "image-alt",
+        "description": "Images must have alternate text",
+        "axeImpact": "moderate",
+        "conformance": ["wcag2a", "wcag111"],
+        "totalItems": 1
+      }
+    ]
+  },
+  "topTenPagesWithMostIssues": [
+    { "url": "https://example.gov.sg/home", "pageTitle": "Home | GovTech", "totalIssues": 3 },
+    { "url": "https://example.gov.sg/services", "pageTitle": "Services | GovTech", "totalIssues": 1 }
+  ],
+  "wcagLinks": {},
+  "wcagPassPercentage": "92.31",
+  "progressPercentage": "50.00",
+  "issuesPercentage": "7.69",
+  "totalPagesScanned": 2,
+  "totalPagesNotScanned": 0,
+  "topTenIssues": [
+    { "rule": "link-name", "totalItems": 2 }
+  ]
 }

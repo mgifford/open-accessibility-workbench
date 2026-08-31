@@ -41,6 +41,20 @@ Supported formats:
  *   parsedData?: any;
  * }}
  */
+/**
+ * True when value looks like an Oobee items-summary severity category, i.e. an
+ * object carrying `totalItems` / `totalRuleIssues` (and usually `rules`).
+ * @param {any} value
+ */
+function isCategoryObject(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (value.totalItems !== undefined || value.totalRuleIssues !== undefined || value.rules !== undefined)
+  );
+}
+
 export function detectReportSource(rawContent, filename = '') {
   if (!rawContent) {
     return {
@@ -104,46 +118,51 @@ export function detectReportSource(rawContent, filename = '') {
       };
     }
 
-    // C. Oobee scanItemsSummary.json
-    if (
+    // Oobee severity categories share the same key names across summary files,
+    // so ordering matters: distinguish by the shape of each category and the
+    // file-specific fields. Shapes follow GovTechSG/oobee jsonArtifacts.ts.
+    const hasOobeeCategories =
       typeof jsonData === 'object' &&
       !Array.isArray(jsonData) &&
-      (jsonData.mustFix !== undefined || jsonData.goodToFix !== undefined || jsonData.needsReview !== undefined) &&
-      jsonData.totalItems !== undefined
-    ) {
+      jsonData !== null &&
+      (jsonData.mustFix !== undefined ||
+        jsonData.goodToFix !== undefined ||
+        jsonData.needsReview !== undefined);
+
+    // Both scanPagesSummary and scanPagesDetail carry `pagesAffected` /
+    // `pagesNotAffected`. They differ in `typesOfIssues`: the *detail* report
+    // lists per-rule objects (with `ruleId`), while the *summary* lists rule-id
+    // strings. Check the more specific (detail) shape first.
+    const firstAffectedPage =
+      typeof jsonData === 'object' && !Array.isArray(jsonData) && jsonData !== null && Array.isArray(jsonData.pagesAffected)
+        ? jsonData.pagesAffected[0]
+        : undefined;
+    const pageHasRuleBreakdown =
+      firstAffectedPage &&
+      Array.isArray(firstAffectedPage.typesOfIssues) &&
+      firstAffectedPage.typesOfIssues.length > 0 &&
+      typeof firstAffectedPage.typesOfIssues[0] === 'object' &&
+      firstAffectedPage.typesOfIssues[0] !== null;
+
+    // F. Oobee scanPagesDetail.json — per-page, per-rule breakdown.
+    if (firstAffectedPage !== undefined && pageHasRuleBreakdown) {
       return {
         recognized: true,
-        type: REPORT_TYPES.OOBEE_ITEMS_SUMMARY_JSON,
+        type: REPORT_TYPES.OOBEE_PAGES_DETAIL_JSON,
         format: 'json',
         system: 'oobee',
-        granularity: 'aggregate',
+        granularity: 'page',
         parsedData: jsonData
       };
     }
 
-    // D. Oobee scanIssuesSummary.json
-    if (
-      Array.isArray(jsonData) &&
-      jsonData.length > 0 &&
-      jsonData[0].issueId !== undefined &&
-      (jsonData[0].severity !== undefined || jsonData[0].issueDescription !== undefined)
-    ) {
-      return {
-        recognized: true,
-        type: REPORT_TYPES.OOBEE_ISSUES_SUMMARY_JSON,
-        format: 'json',
-        system: 'oobee',
-        granularity: 'aggregate',
-        parsedData: jsonData
-      };
-    }
-
-    // E. Oobee scanPagesSummary.json
+    // E. Oobee scanPagesSummary.json — pages split into affected/not-affected.
     if (
       typeof jsonData === 'object' &&
       !Array.isArray(jsonData) &&
-      jsonData.totalPagesScanned !== undefined &&
-      Array.isArray(jsonData.pagesScanned)
+      jsonData !== null &&
+      Array.isArray(jsonData.pagesAffected) &&
+      Array.isArray(jsonData.pagesNotAffected)
     ) {
       return {
         recognized: true,
@@ -155,19 +174,53 @@ export function detectReportSource(rawContent, filename = '') {
       };
     }
 
-    // F. Oobee scanPagesDetail.json
+    // C. Oobee scanItemsSummary.json — severity categories are objects
+    //    ({ totalItems, totalRuleIssues, rules }) alongside scan-level metrics.
     if (
-      Array.isArray(jsonData) &&
-      jsonData.length > 0 &&
-      jsonData[0].url !== undefined &&
-      Array.isArray(jsonData[0].issues)
+      hasOobeeCategories &&
+      isCategoryObject(jsonData.mustFix) &&
+      (jsonData.wcagPassPercentage !== undefined ||
+        jsonData.totalPagesScanned !== undefined ||
+        jsonData.topTenIssues !== undefined ||
+        jsonData.progressPercentage !== undefined)
     ) {
       return {
         recognized: true,
-        type: REPORT_TYPES.OOBEE_PAGES_DETAIL_JSON,
+        type: REPORT_TYPES.OOBEE_ITEMS_SUMMARY_JSON,
         format: 'json',
         system: 'oobee',
-        granularity: 'page',
+        granularity: 'aggregate',
+        parsedData: jsonData
+      };
+    }
+
+    // D. Oobee scanIssuesSummary.json — severity categories are arrays of rules.
+    if (
+      hasOobeeCategories &&
+      (Array.isArray(jsonData.mustFix) ||
+        Array.isArray(jsonData.goodToFix) ||
+        Array.isArray(jsonData.needsReview) ||
+        Array.isArray(jsonData.passed))
+    ) {
+      return {
+        recognized: true,
+        type: REPORT_TYPES.OOBEE_ISSUES_SUMMARY_JSON,
+        format: 'json',
+        system: 'oobee',
+        granularity: 'aggregate',
+        parsedData: jsonData
+      };
+    }
+
+    // Fallback: scanItemsSummary-style category objects without the extra
+    // scan-level metrics still classify as an items summary.
+    if (hasOobeeCategories && isCategoryObject(jsonData.mustFix || jsonData.goodToFix || jsonData.needsReview)) {
+      return {
+        recognized: true,
+        type: REPORT_TYPES.OOBEE_ITEMS_SUMMARY_JSON,
+        format: 'json',
+        system: 'oobee',
+        granularity: 'aggregate',
         parsedData: jsonData
       };
     }
