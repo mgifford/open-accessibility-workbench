@@ -87,3 +87,61 @@ describe('Phase 13: local data clearing (§13.2)', () => {
     assert.doesNotThrow(() => clearLocalData()); // no storage -> no throw
   });
 });
+
+import { classifyReportUrl, fetchRemoteReport, reportUrlFromLocation, TRUSTED_REPORT_HOSTS } from '../../src/adapters/remote-report.js';
+
+describe('Phase 13: secure remote report loading (§13.5)', () => {
+  test('rejects non-HTTPS and unsafe schemes; allows localhost http', () => {
+    assert.equal(classifyReportUrl('http://evil.example/r.json').ok, false);
+    assert.equal(classifyReportUrl('javascript:alert(1)').ok, false);
+    assert.equal(classifyReportUrl('not a url').ok, false);
+    assert.equal(classifyReportUrl('http://localhost:5173/r.json').ok, true);
+    assert.equal(classifyReportUrl('https://example.test/r.json').ok, true);
+  });
+
+  test('a documented trusted host loads without extra confirmation; others require it', () => {
+    assert.equal(classifyReportUrl(`https://${TRUSTED_REPORT_HOSTS[0]}/r.json`).trusted, true);
+    assert.equal(classifyReportUrl('https://random.example/r.json').trusted, false);
+  });
+
+  test('arbitrary origin needs confirmation before fetch', async () => {
+    let fetched = false;
+    const r = await fetchRemoteReport('https://random.example/r.json', { fetchImpl: async () => { fetched = true; return { ok: true, text: async () => '' }; } });
+    assert.equal(r.ok, false);
+    assert.equal(r.needsConfirmation, true);
+    assert.equal(fetched, false, 'must not fetch before confirmation');
+  });
+
+  test('fetch uses credentials:omit and no proxy', async () => {
+    let seenInit = null;
+    await fetchRemoteReport('https://example.test/r.json', {
+      confirmedArbitrary: true,
+      fetchImpl: async (url, init) => { seenInit = { url, init }; return { ok: true, status: 200, text: async () => '{}' }; }
+    });
+    assert.equal(seenInit.init.credentials, 'omit');
+    assert.match(seenInit.url, /^https:\/\/example\.test\//); // direct, no proxy prefix
+  });
+
+  test('a CORS/network failure returns an understandable fallback message', async () => {
+    const r = await fetchRemoteReport('https://example.test/r.json', {
+      confirmedArbitrary: true,
+      fetchImpl: async () => { throw new TypeError('Failed to fetch'); }
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /CORS|download the report and upload/i);
+  });
+
+  test('cancellation during fetch is reported', async () => {
+    const r = await fetchRemoteReport('https://example.test/r.json', {
+      confirmedArbitrary: true,
+      fetchImpl: async () => { const e = new Error('abort'); e.name = 'AbortError'; throw e; }
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /cancelled/i);
+  });
+
+  test('reads ?report= from a query string', () => {
+    assert.equal(reportUrlFromLocation('?report=https://x/r.json'), 'https://x/r.json');
+    assert.equal(reportUrlFromLocation(''), null);
+  });
+});

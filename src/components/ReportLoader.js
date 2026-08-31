@@ -12,12 +12,36 @@ import { buildRemediationTasks } from '../analysis/remediation-tasks.js';
 import { makeSourceReport } from '../analysis/source-registry.js';
 import { technologyStore } from '../state/technology.js';
 import { checkFileSize } from '../utils/input-limits.js';
+import { fetchRemoteReport, reportUrlFromLocation } from '../adapters/remote-report.js';
 import { workspaceStore } from '../state/workspace.js';
 
 export class ReportLoader extends HTMLElement {
   connectedCallback() {
     this.render();
     this.setupListeners();
+    // Honour a ?report= URL parameter (spec §13.5). It is fetched with the same
+    // security rules as manual URL loading (arbitrary origins ask first).
+    const paramUrl = reportUrlFromLocation();
+    if (paramUrl) {
+      const input = this.querySelector('#report-url');
+      if (input) input.value = paramUrl;
+      this.loadFromUrl(paramUrl);
+    }
+  }
+
+  async loadFromUrl(url, confirmedArbitrary = false) {
+    if (!url) return;
+    const result = await fetchRemoteReport(url, { confirmedArbitrary });
+    if (result.needsConfirmation) {
+      // Ask once, then retry with confirmation (native confirm keeps it simple
+      // and keyboard-accessible; no auto-fetch of arbitrary origins).
+      const proceed = typeof confirm === 'function' && confirm(`${result.error}\n\nFetch it anyway?`);
+      if (proceed) return this.loadFromUrl(url, true);
+      this.showError(result.error);
+      return;
+    }
+    if (!result.ok) { this.showError(result.error); return; }
+    this.processFileContent(result.text, result.filename);
   }
 
   render() {
@@ -41,7 +65,18 @@ export class ReportLoader extends HTMLElement {
             </p>
           </div>
 
-          <div id="error-container" style="display: none; background-color: var(--color-urgency-critical-bg); color: var(--color-urgency-critical); padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-urgency-critical);" role="alert"></div>
+          <div id="error-container" style="display: none; background-color: var(--color-urgency-critical-bg); color: var(--color-urgency-critical); padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-urgency-critical);" role="alert" tabindex="-1"></div>
+
+          <div style="display: flex; gap: var(--space-2); align-items: end; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 240px;">
+              <label for="report-url" style="font-size: var(--font-size-xs); font-weight: 700; display: block; margin-bottom: var(--space-1);">Or load a report by URL (HTTPS)</label>
+              <input type="url" id="report-url" placeholder="https://…/report.json" style="width: 100%; padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm);" aria-describedby="report-url-hint" />
+            </div>
+            <button type="button" class="btn btn-secondary" id="load-url-btn">Load from URL</button>
+          </div>
+          <p id="report-url-hint" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+            Report contents stay in your browser; no cookies are sent and no proxy is used. Untrusted hosts ask for confirmation. If a fetch is blocked (CORS), download the report and upload it above.
+          </p>
 
           <div style="display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;">
             <span style="font-size: var(--font-size-sm); color: var(--color-text-muted);">Quick Sample Reports:</span>
@@ -65,6 +100,14 @@ export class ReportLoader extends HTMLElement {
       const file = e.target.files[0];
       if (file) this.loadFile(file);
     });
+
+    const urlBtn = this.querySelector('#load-url-btn');
+    const urlInput = this.querySelector('#report-url');
+    if (urlBtn && urlInput) {
+      const go = () => { const v = urlInput.value.trim(); if (v) this.loadFromUrl(v); };
+      urlBtn.addEventListener('click', go);
+      urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    }
 
     sampleOsBtn.addEventListener('click', async () => {
       try {
