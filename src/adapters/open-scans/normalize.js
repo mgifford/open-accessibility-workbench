@@ -3,6 +3,8 @@
  * Preserves upstream IDs, locators, HTML, and scanner messages.
  */
 
+import { parseWcagTags, wcagLevelFromTags } from '../../utils/wcag-tags.js';
+
 /**
  * @param {object} openScansReport
  * @param {string} [importedRef="report.json"]
@@ -37,18 +39,8 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
         for (const failure of engineData.failures) {
           recordIndex++;
 
-          // Extract WCAG SC tags
-          const wcag = [];
-          if (Array.isArray(failure.wcagSc)) {
-            for (const tag of failure.wcagSc) {
-              const match = tag.match(/wcag(\d)(\d)(\d)/i);
-              if (match) {
-                wcag.push(`${match[1]}.${match[2]}.${match[3]}`);
-              } else if (tag.startsWith('wcag')) {
-                wcag.push(tag.replace('wcag', ''));
-              }
-            }
-          }
+          // Extract WCAG SC tags (tokens like `wcag2aa`, `wcag143`).
+          const wcag = parseWcagTags(failure.wcagSc);
 
           const observation = {
             id: failure.a11yOccurrenceFingerprint || `obs-os-${scanId}-${recordIndex}`,
@@ -65,12 +57,12 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
             classification: {
               sourceCategory: null,
               impact: failure.impact || 'serious',
-              wcagLevel: failure.wcagSc?.some(t => /aaa/i.test(t)) ? 'AAA' : (failure.wcagSc?.some(t => /aa/i.test(t)) ? 'AA' : 'A')
+              wcagLevel: wcagLevelFromTags(failure.wcagSc)
             },
             rule: {
               sourceRuleId: failure.rule || 'unknown-rule',
               normalizedRuleId: normalizeRuleName(failure.rule || ''),
-              wcag: Array.from(new Set(wcag)),
+              wcag,
               actRules: []
             },
             evidence: {
