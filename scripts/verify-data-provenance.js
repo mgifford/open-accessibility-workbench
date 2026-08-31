@@ -11,10 +11,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDataDir = path.resolve(__dirname, '../public/data');
 
-const requiredFiles = [
+// JSON assets that must exist, parse, and be non-empty.
+const requiredJsonFiles = [
   'arrm/metadata.json',
   'arrm/roles.json',
-  'arrm/tasks.json',
   'arrm/wcag-role-map.json',
   'rules/normalized-rules.json',
   'rules/wcag-map.json',
@@ -24,9 +24,18 @@ const requiredFiles = [
   'rag/guidance.json'
 ];
 
+// Raw (non-JSON) provenance assets that must exist and be non-empty. The ARRM
+// data is generated from the verbatim CSV snapshot, so both the snapshot and
+// its provenance record are required. (arrm/tasks.json was intentionally
+// removed when ARRM was regenerated from the real matrix; it is not required.)
+const requiredRawFiles = [
+  'arrm/arrm-wcag-sc.csv',
+  'arrm/SNAPSHOT.md'
+];
+
 let errors = 0;
 
-for (const relPath of requiredFiles) {
+for (const relPath of requiredJsonFiles) {
   const fullPath = path.join(publicDataDir, relPath);
   if (!fs.existsSync(fullPath)) {
     console.error(`[FAIL] Missing required data file: ${relPath}`);
@@ -46,6 +55,14 @@ for (const relPath of requiredFiles) {
   }
 }
 
+for (const relPath of requiredRawFiles) {
+  const fullPath = path.join(publicDataDir, relPath);
+  if (!fs.existsSync(fullPath) || fs.readFileSync(fullPath, 'utf8').trim().length === 0) {
+    console.error(`[FAIL] Missing or empty required provenance asset: ${relPath}`);
+    errors++;
+  }
+}
+
 // Check ARRM provenance metadata
 const arrmMeta = JSON.parse(fs.readFileSync(path.join(publicDataDir, 'arrm/metadata.json'), 'utf8'));
 if (!arrmMeta.source || !arrmMeta.license || !arrmMeta.attribution) {
@@ -61,7 +78,8 @@ if (!ragManifest.license || !ragManifest.provenance || !ragManifest.embeddingMod
 }
 
 if (errors === 0) {
-  console.log(`[PASS] All ${requiredFiles.length} data assets have verified provenance and valid schemas.`);
+  const total = requiredJsonFiles.length + requiredRawFiles.length;
+  console.log(`[PASS] All ${total} data assets have verified provenance and valid schemas.`);
   process.exit(0);
 } else {
   console.error(`[ERROR] Verification failed with ${errors} error(s).`);

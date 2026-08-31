@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Vite / dev server cache
+.vite/
+
+# Logs
+npm-debug.log*
+*.log
+
+# OS / editor cruft
+.DS_Store

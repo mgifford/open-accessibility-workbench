@@ -12,11 +12,11 @@ the schema facts and discrepancies that the adapters and datasets depend on.
 
 | Project | Repo | Branch | Commit (short) |
 | --- | --- | --- | --- |
-| Open Scans | mgifford/open-scans | `main` | `a4aed227280b` |
-| Oobee | GovTechSG/oobee | `master` | `a3d7b75ec526` |
-| Oobee Fix | GovTechSG/oobee-fix | `feat/local-pipeline` (default) | `aa29f7d49a9c` |
-| W3C ARRM | w3c/wai-arrm | `draft` | `a80642c497e7` |
-| Wappalyzer (HTTP Archive fork) | HTTPArchive/wappalyzer | `main` | `acbafda14715` |
+| Open Scans | mgifford/open-scans | `main` | `4aed227280be` |
+| Oobee | GovTechSG/oobee | `master` | `3d7b75ec5267` |
+| Oobee Fix | GovTechSG/oobee-fix | `feat/local-pipeline` (default) | `a29f7d49a9cf` |
+| W3C ARRM | w3c/wai-arrm | `draft` | `80642c497e7f` |
+| Wappalyzer (HTTP Archive fork) | HTTPArchive/wappalyzer | `main` | `cbafda14715f` |
 
 Fixture-level provenance (source URLs, retrieval, transformations, and what was
 kept vs. omitted) lives with the fixtures:
