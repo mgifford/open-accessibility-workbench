@@ -1,13 +1,13 @@
 import { workspaceStore } from '../state/workspace.js';
 import { profileStore } from '../state/profile.js';
-import { isTaskRelevantToProfile } from '../roles/route-task.js';
+import { routeTaskForProfile } from '../roles/route-task.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 import { taskStatusStore, TASK_STATUSES, TASK_STATUS_LABELS } from '../state/task-status.js';
 
 export class TaskList extends HTMLElement {
   constructor() {
     super();
-    this.filterRole = 'all';
+    this.filterView = 'all';
     this.filterUrgency = 'all';
     this.filterStatus = 'all';
   }
@@ -34,22 +34,33 @@ export class TaskList extends HTMLElement {
       return;
     }
 
-    let filtered = tasks;
+    // Pre-compute each task's routing verdict once (deterministic, no mutation).
+    const routed = tasks.map(t => ({ task: t, route: routeTaskForProfile(t, selectedCapabilities) }));
 
-    // Apply role-relevance or explicit filters
-    if (this.filterRole === 'relevant' && selectedCapabilities.length > 0) {
-      filtered = filtered.filter(t => isTaskRelevantToProfile(t, selectedCapabilities));
-    } else if (this.filterRole !== 'all' && this.filterRole !== 'relevant') {
-      filtered = filtered.filter(t => t.roles?.primary?.toLowerCase().includes(this.filterRole));
-    }
+    // Role-aware views (spec §7.6). Each is a reversible filter; nothing is
+    // deleted, and the hidden count is shown below.
+    const viewPredicates = {
+      'all': () => true,
+      'relevant': ({ route }) => route.relevance !== 'handoff',
+      'needs-content': ({ task }) => roleInvolved(task, 'Content'),
+      'needs-design': ({ task }) => roleInvolved(task, 'Visual Design') || roleInvolved(task, 'UX'),
+      'ready-dev': ({ task }) => roleInvolved(task, 'Development'),
+      'needs-a11y-review': ({ task }) => (task.blueprint?.humanDecisionsRequired?.length || 0) > 0 || roleInvolved(task, 'Testing'),
+      'ready-verification': ({ task }) => taskStatusStore.get(task.id) === 'in-progress' || taskStatusStore.get(task.id) === 'done',
+      'needs-another-role': ({ route }) => route.relevance === 'handoff'
+    };
+    const predicate = viewPredicates[this.filterView] || viewPredicates['all'];
 
+    let filteredRouted = routed.filter(predicate);
     if (this.filterUrgency !== 'all') {
-      filtered = filtered.filter(t => t.urgency === this.filterUrgency);
+      filteredRouted = filteredRouted.filter(({ task }) => task.urgency === this.filterUrgency);
     }
-
     if (this.filterStatus !== 'all') {
-      filtered = filtered.filter(t => taskStatusStore.get(t.id) === this.filterStatus);
+      filteredRouted = filteredRouted.filter(({ task }) => taskStatusStore.get(task.id) === this.filterStatus);
     }
+    const filtered = filteredRouted.map(r => r.task);
+    const routeByTaskId = new Map(routed.map(r => [r.task.id, r.route]));
+    const hiddenCount = tasks.length - filtered.length;
 
     const statusCounts = taskStatusStore.summary(tasks.map(t => t.id));
 
@@ -62,19 +73,28 @@ export class TaskList extends HTMLElement {
               ${filtered.length} actionable tasks (from ${tasks.length} total) &bull;
               ${statusCounts.done} done, ${statusCounts['in-progress']} in progress, ${statusCounts['needs-decision']} need a decision, ${statusCounts.open} open
             </p>
+            ${hiddenCount > 0 ? `<p style="font-size: var(--font-size-sm);">
+              <strong>${hiddenCount}</strong> ${hiddenCount === 1 ? 'task is' : 'tasks are'} hidden by the current view.
+              <button type="button" id="view-all-btn" class="btn btn-secondary" style="margin-left: var(--space-2);">View all</button>
+            </p>` : ''}
           </div>
         </div>
+
+        <div id="filter-announcer" role="status" aria-live="polite" class="sr-only"></div>
 
         <!-- Filter Controls -->
         <div class="card" style="padding: var(--space-4); margin-bottom: var(--space-6); display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center;">
           <div>
-            <label for="filter-role" style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary); display: block; margin-bottom: var(--space-1);">Role View:</label>
-            <select id="filter-role" style="padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
-              <option value="all" ${this.filterRole === 'all' ? 'selected' : ''}>All Tasks</option>
-              <option value="relevant" ${this.filterRole === 'relevant' ? 'selected' : ''}>Relevant to My Profile</option>
-              <option value="content" ${this.filterRole === 'content' ? 'selected' : ''}>Content Authoring</option>
-              <option value="visual" ${this.filterRole === 'visual' ? 'selected' : ''}>Visual Design</option>
-              <option value="front-end" ${this.filterRole === 'front-end' ? 'selected' : ''}>Front-End Development</option>
+            <label for="filter-view" style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary); display: block; margin-bottom: var(--space-1);">View:</label>
+            <select id="filter-view" style="padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+              <option value="all" ${this.filterView === 'all' ? 'selected' : ''}>All remediation tasks</option>
+              <option value="relevant" ${this.filterView === 'relevant' ? 'selected' : ''}>Relevant to my work</option>
+              <option value="needs-content" ${this.filterView === 'needs-content' ? 'selected' : ''}>Needs content decision</option>
+              <option value="needs-design" ${this.filterView === 'needs-design' ? 'selected' : ''}>Needs design decision</option>
+              <option value="ready-dev" ${this.filterView === 'ready-dev' ? 'selected' : ''}>Ready for development</option>
+              <option value="needs-a11y-review" ${this.filterView === 'needs-a11y-review' ? 'selected' : ''}>Needs accessibility review</option>
+              <option value="ready-verification" ${this.filterView === 'ready-verification' ? 'selected' : ''}>Ready for verification</option>
+              <option value="needs-another-role" ${this.filterView === 'needs-another-role' ? 'selected' : ''}>Needs another role</option>
             </select>
           </div>
 
@@ -119,9 +139,11 @@ export class TaskList extends HTMLElement {
                 ${escapeHtml(t.blueprint.problem)}
               </div>
 
+              ${renderRelevance(routeByTaskId.get(t.id))}
+
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-muted);">
                 <div>
-                  <strong>Primary Role:</strong> ${escapeHtml(t.roles.primary)}
+                  ${renderRoleGuidance(t.roles)}
                   ${t.componentHypothesis ? ` | <strong>Component:</strong> ${escapeHtml(t.componentHypothesis.name)}` : ''}
                 </div>
                 <div style="display: flex; align-items: center; gap: var(--space-3);">
@@ -144,12 +166,13 @@ export class TaskList extends HTMLElement {
   }
 
   setupListeners() {
-    const roleSelect = this.querySelector('#filter-role');
+    const viewSelect = this.querySelector('#filter-view');
     const urgencySelect = this.querySelector('#filter-urgency');
 
-    if (roleSelect) {
-      roleSelect.addEventListener('change', (e) => {
-        this.filterRole = e.target.value;
+    if (viewSelect) {
+      viewSelect.addEventListener('change', (e) => {
+        this.filterView = e.target.value;
+        this._pendingAnnounce = `View changed to ${e.target.options[e.target.selectedIndex].text}.`;
         this.render();
       });
     }
@@ -169,13 +192,75 @@ export class TaskList extends HTMLElement {
       });
     }
 
+    const viewAllBtn = this.querySelector('#view-all-btn');
+    if (viewAllBtn) {
+      viewAllBtn.addEventListener('click', () => {
+        this.filterView = 'all';
+        this.filterUrgency = 'all';
+        this.filterStatus = 'all';
+        this._pendingAnnounce = 'Showing all tasks.';
+        this.render();
+      });
+    }
+
     // Per-task status changes. The store notifies subscribers, which re-renders.
     this.querySelectorAll('.task-status-select').forEach(sel => {
       sel.addEventListener('change', (e) => {
         taskStatusStore.set(e.target.getAttribute('data-task-id'), e.target.value);
       });
     });
+
+    // Announce an applied filter politely, WITHOUT moving focus (spec §7.4).
+    if (this._pendingAnnounce) {
+      const announcer = this.querySelector('#filter-announcer');
+      if (announcer) announcer.textContent = this._pendingAnnounce;
+      this._pendingAnnounce = null;
+    }
   }
+}
+
+/**
+ * Renders ARRM role guidance preserving primary / secondary / contributor
+ * distinctions (spec §7.2) — never as organizational ownership — and labels the
+ * source (W3C ARRM vs Workbench inference, spec §7.3).
+ */
+function renderRoleGuidance(roles = {}) {
+  const parts = [];
+  if (roles.primary) parts.push(`<strong>Likely primary role:</strong> ${escapeHtml(roles.primary)}`);
+  if (roles.coPrimary && roles.coPrimary.length) parts.push(`<strong>Also primary:</strong> ${escapeHtml(roles.coPrimary.join(', '))}`);
+  if (roles.secondary && roles.secondary.length) parts.push(`<strong>Likely secondary role:</strong> ${escapeHtml(roles.secondary.join(', '))}`);
+  if (roles.contributors && roles.contributors.length) parts.push(`<strong>Possible contributor:</strong> ${escapeHtml(roles.contributors.join(', '))}`);
+  const sourceLabel = roles.source === 'w3c-arrm' ? 'W3C ARRM' : 'Workbench inference';
+  return `${parts.join(' &bull; ')} <span style="color: var(--color-text-muted);">(${sourceLabel})</span>`;
+}
+
+/**
+ * Renders the capability-routing verdict for a task. Relevance is communicated
+ * with a text label and a reason — not colour alone (spec §7.4).
+ */
+function renderRelevance(route) {
+  if (!route || route.relevance === 'unfiltered') return '';
+  const labels = {
+    'direct': 'Direct — you can act on this',
+    'supporting': 'Supporting — you can help',
+    'review-only': 'Review only',
+    'handoff': 'Needs another role — prepare a handoff'
+  };
+  const label = labels[route.relevance] || route.relevance;
+  const reasons = (route.reason || []).map(r => `<li>${escapeHtml(r)}</li>`).join('');
+  return `
+    <div style="margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); background-color: var(--color-bg-subtle); border-left: 3px solid var(--color-border); border-radius: var(--radius-sm); font-size: var(--font-size-xs);">
+      <strong>Relevance:</strong> ${escapeHtml(label)}
+      ${reasons ? `<ul style="margin: var(--space-1) 0 0 var(--space-4);">${reasons}</ul>` : ''}
+    </div>
+  `;
+}
+
+/** True if a role name appears in any of the task's ARRM role tiers. */
+function roleInvolved(task, keyword) {
+  const roles = task.roles || {};
+  const all = [roles.primary, ...(roles.coPrimary || []), ...(roles.secondary || []), ...(roles.contributors || [])].filter(Boolean);
+  return all.some(r => r.includes(keyword));
 }
 
 customElements.define('task-list', TaskList);
