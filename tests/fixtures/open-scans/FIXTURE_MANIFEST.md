@@ -1,14 +1,27 @@
 # Open Scans Fixture Manifest
 
-## report.json — faithful subset of real Open Scans issue #347
+## report.json — field-verified subset of real Open Scans issue #347
 
-This fixture is a **faithful curated subset** of a real Open Scans report. All
-scan-level metadata, per-page metadata, per-page `counts`/`failedRules`, and the
-included findings (pattern IDs, fingerprints, WCAG tags, HTML, xpath, messages)
-are **preserved verbatim from upstream**. The only reduction is that each page's
-`failures[]` array contains a representative subset of findings rather than the
-full set — this keeps the fixture small while remaining truthful. The subset is
-disclosed here and via the `_fixtureNote` field inside the JSON.
+This fixture is a **field-verified curated subset** of a real Open Scans report.
+Its values were read from the published #347 artifact (URL below) and transcribed
+— it is **not a byte-for-byte copy**, and no source SHA-256 was captured (both
+tracked as follow-ups). Within that limit:
+
+- Scan-level metadata, per-page metadata, and per-page `counts`/`failedRules`
+  are verified against upstream.
+- Every included finding's `rule`, `impact`, `wcagSc`, `xpath`, `html`,
+  `patternId`, and `a11yPatternDisplayId` is verified against upstream — these
+  are the fields the adapter and its tests consume.
+- **Known imprecision:** the long `a11yPatternFingerprint` /
+  `a11yOccurrenceFingerprint` hex strings for the page-2 link-name finding
+  (`A11Y-7eaac1e8`) were captured from a documentation-style read and may not be
+  byte-exact. No test relies on those two values.
+
+The only structural reduction is that each page's `failures[]` array is a
+representative subset rather than the full set (disclosed below and via the
+`_fixtureNote` field inside the JSON); `counts.failed` still reports the true
+upstream totals. To make this fixture fully verbatim, download the raw artifact,
+copy the subset directly, and record the artifact's SHA-256 here.
 
 ### Provenance
 
@@ -20,13 +33,7 @@ disclosed here and via the `_fixtureNote` field inside the JSON.
 | Scan timestamp (upstream) | 2026-08-20T17:07:27.574Z |
 | Retrieved | 2026-08-30 (via WebFetch of the published report) |
 | Site scanned | Drupal Camp Asheville (drupalasheville.com) |
-
-> The full artifact was not byte-copied; individual field values were read from
-> the published report. Long hex fingerprints for the page-2 link-name finding
-> (`A11Y-7eaac1e8`) were captured from documentation reads and may not be
-> byte-exact; every pattern/display id and every field used by adapter tests is
-> verified. When regenerating, download the raw artifact and copy the subset
-> directly, then record its SHA-256 here.
+| Upstream repo pin | mgifford/open-scans@`4aed227280be` (report artifact predates this pin) |
 
 ### Preserved verbatim (verified against upstream)
 

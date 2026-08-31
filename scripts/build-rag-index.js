@@ -14,13 +14,20 @@ if (!fs.existsSync(ragDir)) {
   fs.mkdirSync(ragDir, { recursive: true });
 }
 
+// Deterministic build stamp so regenerating with unchanged source data leaves
+// the tracked manifest byte-identical (no dirty working tree). It tracks the
+// source corpus revision, not wall-clock time; override with SOURCE_BUILD_DATE
+// for a real dated release.
+const sourceCorpusRevision = '2026-08-29';
+const buildDate = process.env.SOURCE_BUILD_DATE || sourceCorpusRevision;
+
 const manifest = {
   version: '1.0.0',
   embeddingModel: 'Xenova/all-MiniLM-L6-v2',
   modelRevision: 'main',
   vectorDimension: 384,
-  sourceCorpusRevision: '2026-08-29',
-  buildDate: new Date().toISOString(),
+  sourceCorpusRevision,
+  buildDate,
   itemCount: 4,
   license: 'CC-BY-4.0 / W3C Software and Document Notice',
   provenance: 'Curated knowledge base from W3C ARRM, WCAG 2.2 Techniques, and Open Accessibility Workbench remediation patterns.'

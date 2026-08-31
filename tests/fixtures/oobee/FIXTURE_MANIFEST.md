@@ -16,12 +16,15 @@ against the Workbench's own assumptions.
 | Structure source (CSV) | `src/mergeAxeResults/writeCsv.ts` |
 | Structure source (severity semantics) | `DETAILS.md`, `REPORTS.md` |
 | Branch inspected | `master` |
+| Commit pinned | `3d7b75ec5267` |
 | Date inspected | 2026-08-30 |
 | License | See upstream repository (GovTechSG/oobee) |
 
-> The exact upstream commit hash was not pinned at authoring time because the
-> structures were read from `master` documentation and source. When these
-> fixtures are next regenerated, pin the commit here.
+> These fixtures are **synthetic**: their *shapes* are read from the pinned
+> upstream source/docs above, but they are not preserved copies of a real Oobee
+> scan artifact (see "Not yet covered"). This is a deliberate, documented
+> limitation, not an oversight — a real preserved artifact pinned to a commit
+> + hash is the follow-up that would let the fixtures be called upstream-derived.
 
 ## Verified structural facts (from upstream source)
 
