@@ -7,7 +7,7 @@
 
   --color-text-primary: #0f172a;
   --color-text-secondary: #334155;
-  --color-text-muted: #64748b;
+  --color-text-muted: #475569; /* 6.9:1 on --color-bg-subtle, 7.6:1 on white (WCAG 1.4.3 AA) */
 
   --color-border: #cbd5e1;
   --color-border-strong: #94a3b8;
