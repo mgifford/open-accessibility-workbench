@@ -19,6 +19,7 @@ const requiredJsonFiles = [
   'rules/normalized-rules.json',
   'rules/wcag-map.json',
   'rules/remediation-patterns.json',
+  'rules/rule-guidance.json',
   'technology/guidance.json',
   'rag/manifest.json',
   'rag/guidance.json'

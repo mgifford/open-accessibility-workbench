@@ -222,4 +222,12 @@ fs.writeFileSync(path.join(rulesDir, 'normalized-rules.json'), JSON.stringify(no
 fs.writeFileSync(path.join(rulesDir, 'remediation-patterns.json'), JSON.stringify(remediationPatterns, null, 2));
 fs.writeFileSync(path.join(techDir, 'guidance.json'), JSON.stringify(technologyGuidance, null, 2));
 
-console.log('Rules, remediation patterns, and technology guidance generated successfully.');
+// Emit the curated rule-guidance JSON as an importable JS module so both the
+// browser and Node tests consume it without a JSON import attribute.
+const ruleGuidanceJson = fs.readFileSync(path.join(rulesDir, 'rule-guidance.json'), 'utf8');
+const generated =
+  '// GENERATED from public/data/rules/rule-guidance.json — run `npm run build:data`. Do not edit by hand.\n' +
+  `export const RULE_GUIDANCE = ${ruleGuidanceJson.trim()};\n`;
+fs.writeFileSync(path.resolve(__dirname, '../src/guidance/rule-guidance.generated.js'), generated);
+
+console.log('Rules, remediation patterns, technology guidance, and rule-guidance module generated successfully.');

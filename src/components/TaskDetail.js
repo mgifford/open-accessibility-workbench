@@ -4,6 +4,8 @@ import { runValidationSuite } from '../validation/registry.js';
 import { requestAiRemediation } from '../ai/client.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 import { renderRoleGuidance as renderRoleGuidanceDetail } from '../roles/render-role-guidance.js';
+import { profileStore } from '../state/profile.js';
+import '../components/HandoffBuilder.js';
 
 export class TaskDetail extends HTMLElement {
   constructor() {
@@ -156,9 +158,21 @@ export class TaskDetail extends HTMLElement {
 
           <!-- AI Advisor Panel (Dynamic) -->
           <div id="ai-panel" style="margin-top: var(--space-6); display: none;"></div>
+
+          <!-- Prepare handoff (works with AI disabled) -->
+          <div style="margin-top: var(--space-6);">
+            <handoff-builder id="task-handoff"></handoff-builder>
+          </div>
         </div>
       </section>
     `;
+
+    // Provide the task to the handoff panel (property, not attribute).
+    const handoff = this.querySelector('#task-handoff');
+    if (handoff) {
+      handoff.capabilities = profileStore?.state?.selectedCapabilities || [];
+      handoff.task = task;
+    }
 
     this.setupListeners(task);
   }

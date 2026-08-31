@@ -3,6 +3,17 @@
  */
 
 import { getTechnologyGuidance } from './technology-guidance.js';
+import { getExactRuleGuidance } from './exact-rule.js';
+
+/** Decision concern -> the role that typically makes it (guidance, not ownership). */
+const DECISION_ROLE = {
+  'accessible-name': 'Content Authoring',
+  'text-alternative': 'Content Authoring',
+  'contrast': 'Visual Design',
+  'structure': 'User Experience (UX) Design',
+  'form-labeling': 'Content Authoring',
+  'target-size': 'Visual Design'
+};
 
 export function generateRemediationBlueprint(taskMeta) {
   const {
@@ -94,13 +105,32 @@ export function generateRemediationBlueprint(taskMeta) {
     technologyContext
   );
 
+  // Curated, versioned rule guidance with provenance (spec §9.1).
+  const ruleGuidance = getExactRuleGuidance(ruleId);
+  const family = remediationFamily || familyFromRule(ruleId);
+  const decisionRole = DECISION_ROLE[family] || null;
+
+  // Structured human decisions (spec §9.4): each decision is explicit, with the
+  // role that typically makes it and whether it blocks implementation — so
+  // missing decisions are never hidden inside prose.
+  const humanDecisions = (humanDecisionsRequired || []).map(text => ({
+    decision: text,
+    requiredRole: decisionRole,
+    status: 'unresolved',
+    blocksImplementation: true
+  }));
+
   return {
     problem,
     systemicRationale: whySystemic,
     likelyRootCause,
     whatNeedsToChange,         // always framework-neutral
-    humanDecisionsRequired,
+    remediationFamily: family,
+    humanDecisionsRequired,    // string[] (back-compat)
+    humanDecisions,            // structured (spec §9.4)
+    ruleGuidance,              // curated guidance with provenance (spec §9.1)
     targetMarkup,              // always framework-neutral (never a source patch)
+    sourceAwareCandidate: null, // only populated when source is supplied (spec §9.5)
     technologyGuidance,        // optional, additive framework context or null
     verificationSteps,
     nativeSemanticsFirst: true
