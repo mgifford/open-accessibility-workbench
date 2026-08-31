@@ -22,7 +22,11 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
     const row = oobeeRecords[i];
     const ruleId = row.issueId || row.rule || 'unknown-rule';
     const severity = row.severity || 'mustFix';
-    const impact = row.axeImpact || (severity === 'mustFix' ? 'serious' : 'moderate');
+    // Retain the scanner's axe impact exactly; do NOT fabricate one from the
+    // severity category when the scanner did not report an impact (the two are
+    // distinct concepts). `impactSource` records provenance.
+    const hasAxeImpact = typeof row.axeImpact === 'string' && row.axeImpact.trim() !== '';
+    const impact = hasAxeImpact ? row.axeImpact : null;
 
     // Parse WCAG conformance. Oobee emits comma-joined success-criterion tokens
     // of the form `wcag2a,wcag412` (see GovTechSG/oobee writeCsv.ts:
@@ -51,7 +55,8 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
       },
       classification: {
         sourceCategory: severity, // 'mustFix' | 'goodToFix' | 'needsReview'
-        impact: impact,
+        impact, // axe impact as reported by Oobee, or null if not provided
+        impactSource: hasAxeImpact ? 'scanner' : 'none',
         wcagLevel
       },
       rule: {

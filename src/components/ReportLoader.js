@@ -3,6 +3,7 @@ import { parseOpenScansReportJson } from '../adapters/open-scans/report-json.js'
 import { parseOpenScansOverlapJson } from '../adapters/open-scans/overlap-json.js';
 import { parseOpenScansReportCsv } from '../adapters/open-scans/report-csv.js';
 import { parseOobeeReportCsv } from '../adapters/oobee/report-csv.js';
+import { decompressGzipB64 } from '../adapters/oobee/decompress.js';
 import { enrichObservationsWithSignatures } from '../analysis/canonicalize.js';
 import { clusterPatternOccurrences } from '../analysis/pattern-cluster.js';
 import { buildComponentHypotheses } from '../analysis/component-hypothesis.js';
@@ -30,9 +31,9 @@ export class ReportLoader extends HTMLElement {
             <label for="file-input" style="font-weight: 600; display: block; margin-bottom: var(--space-2); cursor: pointer;">
               Choose a report file or drag it here
             </label>
-            <input type="file" id="file-input" accept=".json,.csv,.txt" style="margin: 0 auto; display: block;" aria-describedby="file-hint" />
+            <input type="file" id="file-input" accept=".json,.csv,.txt,.b64" style="margin: 0 auto; display: block;" aria-describedby="file-hint" />
             <p id="file-hint" style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">
-              Supported: Open Scans report.json / report.csv, Oobee report.csv / summary JSONs
+              Supported: Open Scans report.json / report.csv, Oobee report.csv / summary JSONs, and compressed Oobee .json.gz.b64
             </p>
           </div>
 
@@ -94,8 +95,20 @@ export class ReportLoader extends HTMLElement {
 
   loadFile(file) {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      this.processFileContent(e.target.result, file.name);
+    reader.onload = async (e) => {
+      let text = e.target.result;
+      // Compressed Oobee payloads: .json.gz.b64 (base64-encoded gzip). Decompress
+      // locally before detection; report a clear error if the browser lacks the
+      // needed API rather than feeding garbage to the detector.
+      if (/\.json\.gz\.b64$/i.test(file.name)) {
+        try {
+          text = await decompressGzipB64(text);
+        } catch (err) {
+          this.showError('Could not decompress this .json.gz.b64 file: ' + err.message);
+          return;
+        }
+      }
+      this.processFileContent(text, file.name.replace(/\.gz\.b64$/i, ''));
     };
     reader.onerror = () => {
       this.showError('Error reading local file.');
