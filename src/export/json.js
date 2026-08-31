@@ -1,5 +1,10 @@
 /**
- * Exports remediation tasks in standard JSON format with full provenance.
+ * Exports remediation tasks in standard JSON format.
+ *
+ * NOTE: this is a task-level export. It does not yet embed each task's
+ * constituent observations or their record pointers; full observation-level
+ * provenance in exports is a later-phase deliverable. Do not describe this
+ * output as carrying full provenance.
  */
 
 export function exportTasksToJson(workspaceData, options = {}) {

@@ -56,8 +56,12 @@ interface CanonicalObservation {
     version: string | null;
     format: string; // e.g. "report.json", "report.csv"
     scanId: string;
+    sourceReportId: string | null; // id in the workspace source-report registry
     importedAt: string; // ISO 8601
     originalRef: string | null;
+    recordPointer: string; // stable path to the exact source record
+                           // Open Scans: "/results/{page}/{engine}/failures/{i}"
+                           // Oobee CSV:  "row:{i}"
   };
   page: {
     submittedUrl: string;
@@ -69,7 +73,8 @@ interface CanonicalObservation {
   };
   classification: {
     sourceCategory: "mustFix" | "goodToFix" | "needsReview" | null;
-    impact: "critical" | "serious" | "moderate" | "minor" | null;
+    impact: "critical" | "serious" | "moderate" | "minor" | null; // null when unreported
+    impactSource: "scanner" | "none"; // never fabricated from severity
     wcagLevel: "A" | "AA" | "AAA" | null;
   };
   rule: {
@@ -88,6 +93,7 @@ interface CanonicalObservation {
   };
   identity: {
     sourceFindingId: string | null;
+    sourceFindingIdSource?: "upstream" | "workbench-derived"; // provenance of the id
     sourcePatternId: string | null;
     sourceOccurrenceId: string | null;
     sourceFingerprint: string | null;

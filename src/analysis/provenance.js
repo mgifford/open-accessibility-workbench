@@ -58,27 +58,85 @@ export function traceFinding(finding) {
 }
 
 /**
- * Verifies that a finding has complete provenance on all four Phase 4 axes for
- * every constituent observation: source report, original record, scanner/tool,
- * and page. Returns { complete, gaps } where gaps lists any missing axis with
- * the offending observation index.
+ * Verifies that a finding has complete, *resolvable* provenance on all four
+ * Phase 4 axes for every constituent observation: source report, original
+ * record, scanner/tool, and page. This checks that provenance IDENTIFIES and
+ * RESOLVES to real things — not merely that string fields are present.
+ *
  * @param {object} finding
- * @returns {{ complete: boolean, gaps: Array<{ index: number, axis: string }> }}
+ * @param {object} [options]
+ * @param {(id: string) => object|null} [options.resolveSourceReport] - given a
+ *   `source.sourceReportId`, returns the registered source-report descriptor or
+ *   null. When provided, every observation MUST reference a source report that
+ *   resolves. When omitted, a source report is accepted if it carries a concrete
+ *   identity (system + format + a non-empty scanId or originalRef).
+ * @param {(observation: object, report: object|null) => boolean} [options.resolveRecord]
+ *   - given an observation and its resolved report, returns whether its
+ *   recordPointer actually locates a record. When omitted, a syntactically valid
+ *   pointer is required (a well-formed shape), not just any string.
+ * @returns {{ complete: boolean, gaps: Array<{ index: number, axis: string, reason: string }> }}
  */
-export function verifyFindingProvenance(finding) {
-  const traces = traceFinding(finding);
+export function verifyFindingProvenance(finding, options = {}) {
+  const { resolveSourceReport, resolveRecord } = options;
+  const observations = Array.isArray(finding?.observations) ? finding.observations : [];
   const gaps = [];
 
-  traces.forEach((t, index) => {
-    if (!t.sourceReport.system || !t.sourceReport.format) gaps.push({ index, axis: 'source-report' });
-    // An original record is identified by a stable pointer, a finding id, or an
-    // index — any one suffices, but at least one must be present.
-    if (t.originalRecord.pointer == null && t.originalRecord.findingId == null && t.originalRecord.recordIndex == null) {
-      gaps.push({ index, axis: 'original-record' });
+  observations.forEach((obs, index) => {
+    const src = obs?.source || {};
+    const prov = obs?.provenance || {};
+    const id = obs?.identity || {};
+    const page = obs?.page || {};
+
+    // --- which source report ---------------------------------------------
+    let report = null;
+    if (resolveSourceReport) {
+      report = src.sourceReportId ? resolveSourceReport(src.sourceReportId) : null;
+      if (!report) {
+        gaps.push({ index, axis: 'source-report', reason: 'sourceReportId does not resolve to a registered report' });
+      }
+    } else {
+      const hasIdentity =
+        nonEmpty(src.system) && nonEmpty(src.format) && (nonEmpty(src.scanId) || nonEmpty(src.originalRef));
+      if (!hasIdentity) {
+        gaps.push({ index, axis: 'source-report', reason: 'missing concrete source identity (system/format/scanId|originalRef)' });
+      }
     }
-    if (!t.scanner) gaps.push({ index, axis: 'scanner' });
-    if (!t.page.submittedUrl && !t.page.finalUrl) gaps.push({ index, axis: 'page' });
+
+    // --- which original record -------------------------------------------
+    if (resolveRecord) {
+      if (!resolveRecord(obs, report)) {
+        gaps.push({ index, axis: 'original-record', reason: 'recordPointer does not locate a source record' });
+      }
+    } else if (!isValidRecordPointer(src.recordPointer) && !nonEmpty(id.sourceFindingId)) {
+      // Without a resolver, require a WELL-FORMED pointer or a concrete finding
+      // id — a stray recordIndex or an arbitrary string is not enough.
+      gaps.push({ index, axis: 'original-record', reason: 'no well-formed record pointer or finding id' });
+    }
+
+    // --- which scanner/tool ----------------------------------------------
+    if (!nonEmpty(prov.scanner)) {
+      gaps.push({ index, axis: 'scanner', reason: 'missing scanner' });
+    }
+
+    // --- which page -------------------------------------------------------
+    if (!nonEmpty(page.submittedUrl) && !nonEmpty(page.finalUrl)) {
+      gaps.push({ index, axis: 'page', reason: 'missing page url' });
+    }
   });
 
-  return { complete: traces.length > 0 && gaps.length === 0, gaps };
+  return { complete: observations.length > 0 && gaps.length === 0, gaps };
+}
+
+function nonEmpty(v) {
+  return typeof v === 'string' && v.trim() !== '';
+}
+
+/**
+ * A record pointer is well-formed if it matches a known shape:
+ *  - Open Scans: /results/{n}/{engine}/failures/{n}
+ *  - Oobee CSV:  row:{n}
+ */
+function isValidRecordPointer(pointer) {
+  if (typeof pointer !== 'string') return false;
+  return /^\/results\/\d+\/[A-Za-z]+\/failures\/\d+$/.test(pointer) || /^row:\d+$/.test(pointer);
 }

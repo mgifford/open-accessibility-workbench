@@ -34,12 +34,14 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
     const wcag = parseWcagTags(row.wcagConformance);
     const wcagLevel = wcagLevelFromTags(row.wcagConformance);
 
-    // Oobee's CSV has no upstream unique finding id, but a finding is pinned by
-    // (issueId, url, xpath). Compose a stable, Workbench-derived identifier so a
-    // normalized record maps deterministically back to its source row.
-    const derivedFindingId = [row.issueId, row.url, row.xpath]
+    // Oobee's CSV has no upstream unique finding id. (issueId, url, xpath)
+    // describes a finding but is NOT unique — two identical rows share it. Append
+    // the 0-based row ordinal so the derived id uniquely identifies THIS row
+    // while still exposing the human-meaningful descriptor.
+    const findingDescriptor = [row.issueId, row.url, row.xpath]
       .map(v => (v || '').trim())
       .join('|');
+    const derivedFindingId = `${findingDescriptor}#${i}`;
 
     const observation = {
       id: `obs-oobee-${i + 1}`,
@@ -49,6 +51,7 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
         version: null,
         format: 'report.csv',
         scanId: row.customFlowLabel || 'oobee-scan',
+        sourceReportId: null, // stamped by the loader from the source registry
         importedAt,
         originalRef: importedRef,
         // CSV row index (0-based data rows, excluding the header).

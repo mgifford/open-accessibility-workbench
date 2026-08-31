@@ -9,6 +9,7 @@ import { enrichObservationsWithSignatures } from '../analysis/canonicalize.js';
 import { clusterPatternOccurrences } from '../analysis/pattern-cluster.js';
 import { buildComponentHypotheses } from '../analysis/component-hypothesis.js';
 import { buildRemediationTasks } from '../analysis/remediation-tasks.js';
+import { makeSourceReport } from '../analysis/source-registry.js';
 import { workspaceStore } from '../state/workspace.js';
 
 export class ReportLoader extends HTMLElement {
@@ -152,9 +153,24 @@ export class ReportLoader extends HTMLElement {
       // being pushed through the pattern/task pipeline.
       const summaryData = ingestSummaryFormat(detection, content);
       if (summaryData) {
+        // Aggregate reports create no findings but are still normalized workspace
+        // evidence, so they get a durable source-report identity too.
+        const summaryReport = makeSourceReport({
+          filename,
+          system: detection.system,
+          format: detection.format,
+          scanId: null,
+          rawContent: typeof content === 'string' ? content : JSON.stringify(content)
+        });
+        summaryData.sourceReportId = summaryReport.id;
+        summaryData.filename = filename;
+        summaryData.importedAt = summaryReport.importedAt;
+        const existing = workspaceStore.state.sourceReports || [];
+        const sourceReports = existing.some(r => r.id === summaryReport.id) ? existing : [...existing, summaryReport];
         workspaceStore.setState({
           loaded: true,
-          sourceSummary: { system: detection.system, format: detection.format, filename, granularity: summaryData.granularity },
+          sourceSummary: { system: detection.system, format: detection.format, filename, granularity: summaryData.granularity, sourceReportId: summaryReport.id },
+          sourceReports,
           observations: [],
           clusters: [],
           hypotheses: [],
@@ -208,6 +224,20 @@ export class ReportLoader extends HTMLElement {
         return;
       }
 
+      // Register a durable source-report identity and stamp every observation
+      // with its sourceReportId, so provenance can be RESOLVED (not just
+      // asserted) and two same-named reports stay distinguishable.
+      const sourceReport = makeSourceReport({
+        filename,
+        system: detection.system,
+        format: detection.format,
+        scanId: sourceSummary.scanId ?? null,
+        rawContent: typeof content === 'string' ? content : JSON.stringify(content)
+      });
+      for (const obs of observations) {
+        if (obs.source) obs.source.sourceReportId = sourceReport.id;
+      }
+
       // Attach cross-scanner overlap statistics when available.
       let overlapData = null;
       if (overlapContent) {
@@ -221,9 +251,17 @@ export class ReportLoader extends HTMLElement {
       const hypotheses = buildComponentHypotheses(clusters, totalPages);
       const tasks = buildRemediationTasks(clusters, hypotheses, totalPages);
 
+      // Merge into the workspace's source-report registry (supports multiple
+      // imported reports over a session).
+      const existingReports = workspaceStore.state.sourceReports || [];
+      const sourceReports = existingReports.some(r => r.id === sourceReport.id)
+        ? existingReports
+        : [...existingReports, sourceReport];
+
       workspaceStore.setState({
         loaded: true,
-        sourceSummary: { ...sourceSummary, rawTotals, pageSummaries },
+        sourceSummary: { ...sourceSummary, rawTotals, pageSummaries, sourceReportId: sourceReport.id },
+        sourceReports,
         observations: enriched,
         clusters,
         hypotheses,

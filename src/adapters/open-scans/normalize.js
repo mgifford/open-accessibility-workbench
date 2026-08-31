@@ -56,6 +56,7 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
               version: null,
               format: 'report.json',
               scanId,
+              sourceReportId: null, // stamped by the loader from the source registry
               importedAt,
               originalRef: importedRef,
               recordPointer
@@ -63,7 +64,11 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
             page: { ...page },
             classification: {
               sourceCategory: null,
-              impact: failure.impact || 'serious',
+              // Retain the scanner's impact exactly; never fabricate one when
+              // the scanner reported none (matches the Oobee model and
+              // DATA_MODEL.md's "normalizers do not invent missing values").
+              impact: hasImpact(failure.impact) ? failure.impact : null,
+              impactSource: hasImpact(failure.impact) ? 'scanner' : 'none',
               wcagLevel: wcagLevelFromTags(failure.wcagSc)
             },
             rule: {
@@ -105,6 +110,10 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
   }
 
   return observations;
+}
+
+function hasImpact(v) {
+  return typeof v === 'string' && v.trim() !== '';
 }
 
 function normalizeRuleName(rawRule) {

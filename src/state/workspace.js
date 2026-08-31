@@ -15,6 +15,7 @@ class WorkspaceStore {
       tasks: [],
       overlapData: null,
       summaryData: null,
+      sourceReports: [],
       activeTaskId: null,
       userConfirmedTech: null
     };
@@ -49,6 +50,7 @@ class WorkspaceStore {
       tasks: [],
       overlapData: null,
       summaryData: null,
+      sourceReports: [],
       activeTaskId: null,
       userConfirmedTech: null
     };

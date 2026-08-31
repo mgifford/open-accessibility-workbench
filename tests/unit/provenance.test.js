@@ -97,4 +97,51 @@ describe('Phase 4 gate: provenance tracing', () => {
     assert.ok(axes.includes('scanner'));
     assert.ok(axes.includes('page'));
   });
+
+  test('adversarial: null source identity + bogus pointer must NOT verify', () => {
+    // The exact reviewer reproducer: no scanId/originalRef, and a syntactically
+    // valid but fabricated pointer. Existence alone must not satisfy the gate.
+    const bogus = {
+      observations: [{
+        source: { system: 'oobee', format: 'report.csv', scanId: null, originalRef: null, recordPointer: 'row:999999' },
+        provenance: { scanner: 'oobee/axe', sourceRecordIndex: null },
+        identity: { sourceFindingId: null },
+        page: { submittedUrl: 'https://x/y' }
+      }]
+    };
+    const { complete, gaps } = verifyFindingProvenance(bogus);
+    assert.equal(complete, false);
+    assert.ok(gaps.some(g => g.axis === 'source-report'));
+  });
+
+  test('malformed record pointer is rejected', () => {
+    const bad = {
+      observations: [{
+        source: { system: 'open-scans', format: 'report.json', originalRef: 'report.json', recordPointer: 'not-a-pointer' },
+        provenance: { scanner: 'axe' },
+        identity: { sourceFindingId: null },
+        page: { submittedUrl: 'https://x/y' }
+      }]
+    };
+    const { complete, gaps } = verifyFindingProvenance(bad);
+    assert.equal(complete, false);
+    assert.ok(gaps.some(g => g.axis === 'original-record'));
+  });
+
+  test('resolver-based verification requires a registered, resolvable report', () => {
+    const parsed = parseOpenScansReportJson(fs.readFileSync(path.join(osDir, 'report.json'), 'utf8'));
+    // Stamp a source-report id the way the loader does.
+    for (const o of parsed.observations) o.source.sourceReportId = 'src-open-scans-abcd1234';
+    const tasks = buildTasksFromObservations(parsed.observations, parsed.totalPages);
+
+    const registry = { 'src-open-scans-abcd1234': { id: 'src-open-scans-abcd1234' } };
+    const resolve = id => registry[id] || null;
+
+    // Resolves -> complete.
+    assert.equal(verifyFindingProvenance(tasks[0], { resolveSourceReport: resolve }).complete, true);
+    // Unknown registry -> fails on source-report.
+    const bad = verifyFindingProvenance(tasks[0], { resolveSourceReport: () => null });
+    assert.equal(bad.complete, false);
+    assert.ok(bad.gaps.some(g => g.axis === 'source-report'));
+  });
 });
