@@ -278,6 +278,7 @@ export class ReportLoader extends HTMLElement {
         observations: enriched,
         clusters,
         hypotheses,
+        scanMetadata, // retained so technology changes can recompute tasks
         tasks,
         overlapData,
         summaryData: null,

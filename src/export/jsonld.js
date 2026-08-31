@@ -34,10 +34,22 @@ export function exportTasksToJsonLd(workspaceData) {
       urgencyLevel: t.urgency,
       leverageLevel: t.leverage,
       assignedRoles: {
-        primary: t.roles?.primary || 'Front-End Development',
+        primary: t.roles?.primary || null,
+        coPrimary: t.roles?.coPrimary || [],
         secondary: t.roles?.secondary || [],
-        guidanceSource: t.roles?.source || 'W3C ARRM'
+        contributors: t.roles?.contributors || [],
+        guidanceSource: t.roles?.source || 'unmapped',
+        needsAccessibilityTriage: Boolean(t.roles?.needsAccessibilityTriage),
+        assignments: t.roles?.assignments || []
       },
+      technologyContext: t.technologyContext ? {
+        name: t.technologyContext.name,
+        category: t.technologyContext.category || null,
+        confidence: t.technologyContext.confidence,
+        source: t.technologyContext.source,
+        confirmed: Boolean(t.technologyContext.confirmed),
+        evidence: t.technologyContext.evidence || []
+      } : null,
       componentHypothesis: t.componentHypothesis ? {
         name: t.componentHypothesis.name,
         confidence: t.componentHypothesis.confidence,
@@ -47,6 +59,7 @@ export function exportTasksToJsonLd(workspaceData) {
         problemStatement: t.blueprint.problem,
         rootCause: t.blueprint.likelyRootCause,
         remediationSummary: t.blueprint.whatNeedsToChange,
+        technologyGuidance: t.blueprint.technologyGuidance || null,
         humanDecisionsRequired: t.blueprint.humanDecisionsRequired,
         verificationSteps: t.blueprint.verificationSteps
       }

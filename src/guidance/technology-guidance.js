@@ -77,10 +77,13 @@ export function getTechnologyGuidance(remediationFamily, technologyContext) {
   // Only offer framework guidance for a defensibly-known technology: confirmed,
   // metadata, imported detector, or a STRONG report-evidence marker. Never for a
   // weak heuristic / low confidence, and never for Unknown.
-  const defensible = confirmed
-    || source === 'metadata'
-    || source === 'detector'
-    || (source === 'report-evidence' && (confidence === 'high' || confidence === 'medium'));
+  // Framework guidance requires a defensibly-known technology. User confirmation
+  // always qualifies; every other source (metadata, detector, report-evidence)
+  // must reach at least MEDIUM confidence. A low-confidence source of ANY kind
+  // produces no framework guidance (spec §8.5: weak evidence must not change
+  // output language).
+  const highEnough = confidence === 'high' || confidence === 'medium';
+  const defensible = confirmed || (highEnough && ['metadata', 'detector', 'report-evidence'].includes(source));
   if (!defensible) return null;
 
   const key = resolveTechKey(name);

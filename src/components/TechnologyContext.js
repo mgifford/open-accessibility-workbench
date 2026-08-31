@@ -1,4 +1,6 @@
 import { technologyStore, TECHNOLOGY_OPTIONS } from '../state/technology.js';
+import { workspaceStore } from '../state/workspace.js';
+import { getTechnologyContext } from '../technology/context.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 
 /**
@@ -6,19 +8,38 @@ import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
  * replace, or return to Unknown, and inspect the evidence used. Detection is
  * advisory — the user is always in control, and framework-neutral guidance
  * remains available regardless.
+ *
+ * With an explicit `context` property it shows that; otherwise it derives the
+ * current workspace-level resolved context from the loaded observations plus the
+ * technology store, so it works standalone on the "Roles & Context" route.
  */
 export class TechnologyContextComponent extends HTMLElement {
   set context(ctx) { this._ctx = ctx; this.render(); }
 
   connectedCallback() {
-    this._unsub = technologyStore.subscribe(() => this.render());
+    this._unsubTech = technologyStore.subscribe(() => this.render());
+    this._unsubWs = workspaceStore.subscribe(() => this.render());
     this.render();
   }
-  disconnectedCallback() { if (this._unsub) this._unsub(); }
+  disconnectedCallback() {
+    if (this._unsubTech) this._unsubTech();
+    if (this._unsubWs) this._unsubWs();
+  }
+
+  _resolveContext() {
+    if (this._ctx) return this._ctx;
+    const ws = workspaceStore.state;
+    const tech = technologyStore.state;
+    if (!ws.loaded) return null;
+    return getTechnologyContext(ws.observations || [], tech.confirmed || null, ws.scanMetadata || null, tech.rejected || []);
+  }
 
   render() {
-    const ctx = this._ctx;
-    if (!ctx) return;
+    const ctx = this._resolveContext();
+    if (!ctx) {
+      this.innerHTML = `<div style="color: var(--color-text-muted); font-size: var(--font-size-sm);">Load a report to see its technology context.</div>`;
+      return;
+    }
     const { name, category, confidence, source, evidence, confirmed } = ctx;
     const state = technologyStore.state;
 

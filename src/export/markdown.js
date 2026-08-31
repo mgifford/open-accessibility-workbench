@@ -25,13 +25,17 @@ export function exportTasksToMarkdown(workspaceData) {
     lines.push(`### [${task.id}] ${task.title}`);
     lines.push(`- **Urgency**: ${task.urgency.toUpperCase()} | **Leverage**: ${task.leverage.toUpperCase()}`);
     lines.push(`- **WCAG Criteria**: ${task.wcag.join(', ') || 'N/A'}`);
-    lines.push(`- **Primary Role**: ${task.roles?.primary || 'Front-End Development'}`);
+    lines.push(`- **Likely primary role involvement**: ${task.roles?.primary || 'Needs accessibility triage'} (source: ${task.roles?.source || 'unmapped'})`);
     if (task.roles?.secondary?.length) {
       lines.push(`- **Supporting Roles**: ${task.roles.secondary.join(', ')}`);
     }
     lines.push(`- **Affected Pages**: ${task.metrics.affectedPagesCount} (${task.metrics.observationCount} occurrences)`);
     if (task.componentHypothesis) {
       lines.push(`- **Component Hypothesis**: ${task.componentHypothesis.name} (${task.componentHypothesis.confidence} confidence)`);
+    }
+    const tc = task.technologyContext;
+    if (tc && tc.name !== 'Unknown') {
+      lines.push(`- **Technology Context**: ${tc.name}${tc.category ? ` (${tc.category})` : ''} — ${tc.confirmed ? 'confirmed' : `${tc.confidence} confidence, ${tc.source}`}`);
     }
     lines.push(``);
     lines.push(`#### Problem & Systemic Rationale`);
@@ -50,10 +54,17 @@ export function exportTasksToMarkdown(workspaceData) {
       lines.push(``);
     }
     if (task.blueprint.targetMarkup) {
-      lines.push(`#### Target Markup / Guidance`);
+      lines.push(`#### Target Markup / Guidance (framework-neutral)`);
       lines.push('```html');
       lines.push(task.blueprint.targetMarkup);
       lines.push('```');
+      lines.push(``);
+    }
+    if (task.blueprint.technologyGuidance) {
+      const g = task.blueprint.technologyGuidance;
+      lines.push(`#### ${g.technology} note (${g.basis})`);
+      lines.push(`${g.note}`);
+      lines.push(`*(Extends — does not replace — the framework-neutral guidance above.)*`);
       lines.push(``);
     }
     lines.push(`#### Verification Steps`);

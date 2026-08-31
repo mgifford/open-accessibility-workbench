@@ -15,13 +15,22 @@ import './components/ValidationResults.js';
 import './components/ExportPanel.js';
 import { Router } from './router.js';
 import { workspaceStore } from './state/workspace.js';
+import { technologyStore } from './state/technology.js';
 
 const routes = {
   '#/import': () => '<report-loader></report-loader>',
   '#/overview': () => '<report-overview></report-overview>',
   '#/patterns': () => '<pattern-explorer></pattern-explorer>',
   '#/tasks': () => '<task-list></task-list>',
-  '#/roles': () => '<role-profile></role-profile>',
+  '#/roles': () => `
+    <role-profile></role-profile>
+    <section class="card" aria-labelledby="tech-context-title" style="margin-top: var(--space-6);">
+      <h2 id="tech-context-title" class="card-title">Technology Context</h2>
+      <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin: var(--space-2) 0 var(--space-4);">
+        Confirm, reject, or set the implementation technology to tailor guidance. Framework-neutral HTML guidance is always available.
+      </p>
+      <technology-context></technology-context>
+    </section>`,
   '#/export': () => '<export-panel></export-panel>',
   '#/about': () => `
     <section class="card">
@@ -45,6 +54,12 @@ const routes = {
 window.addEventListener('DOMContentLoaded', () => {
   const router = new Router(routes, 'app-root');
   router.init();
+
+  // When the user confirms/rejects/replaces/resets technology, rebuild the
+  // loaded tasks (contexts, blueprints, guidance) without re-parsing the report.
+  technologyStore.subscribe((techState) => {
+    workspaceStore.recomputeTasks(techState);
+  });
 
   // Register service worker for offline asset caching
   if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {

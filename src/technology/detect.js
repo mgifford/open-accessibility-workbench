@@ -77,39 +77,61 @@ export function detectTechnologyFromObservations(observations = [], userConfirme
   return { ...UNKNOWN };
 }
 
+/**
+ * Normalizes an upstream confidence (numeric 0-100 OR string) into our bands.
+ * Unknown/absent confidence defaults to 'medium' (present-but-unqualified), never
+ * 'high' — only user confirmation is high.
+ */
+export function normalizeConfidence(value) {
+  if (typeof value === 'number') {
+    if (value >= 80) return 'high';
+    if (value >= 40) return 'medium';
+    return 'low';
+  }
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    if (v === 'high') return 'high';
+    if (v === 'medium' || v === 'med') return 'medium';
+    if (v === 'low') return 'low';
+    const n = Number(v);
+    if (!Number.isNaN(n)) return normalizeConfidence(n);
+  }
+  return 'medium';
+}
+
+/** Maps a raw imported record to a context, preserving raw fields. */
+function toContext(rec, source) {
+  return {
+    name: rec.name,
+    category: rec.category || getCategoryForTech(rec.name),
+    confidence: normalizeConfidence(rec.confidence),
+    source,
+    evidence: Array.isArray(rec.evidence) ? rec.evidence
+      : [source === 'metadata' ? 'Technology reported in scan metadata.' : 'Imported technology detector output.'],
+    confirmed: false,
+    raw: rec // preserve unrecognized upstream fields
+  };
+}
+
 function pickMetadataTechnology(scanMetadata, rejectedSet) {
   const list = scanMetadata?.technologies;
   if (!Array.isArray(list) || list.length === 0) return null;
-  const top = list.find(t => t && t.name && !rejectedSet.has(String(t.name).toLowerCase()));
-  if (!top) return null;
-  return {
-    name: top.name,
-    category: top.category || getCategoryForTech(top.name),
-    // Numeric upstream confidence (0-100) mapped to our bands; metadata is
-    // authoritative-ish but still not user-confirmed.
-    confidence: typeof top.confidence === 'number' ? (top.confidence >= 80 ? 'high' : top.confidence >= 40 ? 'medium' : 'low') : 'high',
-    source: 'metadata',
-    evidence: Array.isArray(top.evidence) ? top.evidence : ['Technology reported in scan metadata.'],
-    confirmed: false,
-    // Preserve unrecognized upstream fields rather than discarding them.
-    raw: top
-  };
+  const usable = list.filter(t => t && t.name && !rejectedSet.has(String(t.name).toLowerCase()));
+  if (usable.length === 0) return null;
+  const ctx = toContext(usable[0], 'metadata');
+  // Preserve EVERY imported record separately from the selected context (#5).
+  ctx.allTechnologies = usable.map(t => toContext(t, 'metadata'));
+  return ctx;
 }
 
 function pickImportedDetector(scanMetadata, rejectedSet) {
   const list = scanMetadata?.detectorResults;
   if (!Array.isArray(list) || list.length === 0) return null;
-  const top = list.find(t => t && t.name && !rejectedSet.has(String(t.name).toLowerCase()));
-  if (!top) return null;
-  return {
-    name: top.name,
-    category: top.category || getCategoryForTech(top.name),
-    confidence: 'medium',
-    source: 'detector',
-    evidence: Array.isArray(top.evidence) ? top.evidence : ['Imported technology detector output.'],
-    confirmed: false,
-    raw: top
-  };
+  const usable = list.filter(t => t && t.name && !rejectedSet.has(String(t.name).toLowerCase()));
+  if (usable.length === 0) return null;
+  const ctx = toContext(usable[0], 'detector');
+  ctx.allTechnologies = usable.map(t => toContext(t, 'detector'));
+  return ctx;
 }
 
 // Report-evidence markers. `strong` markers are CMS/framework-specific enough to

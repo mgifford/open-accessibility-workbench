@@ -110,6 +110,9 @@ export class TaskDetail extends HTMLElement {
             </div>
           ` : ''}
 
+          <!-- Technology Context (additive; framework-neutral guidance always applies) -->
+          ${renderTaskTechnology(task)}
+
           <!-- Observed Scanner Evidence -->
           <div style="margin-bottom: var(--space-6);">
             <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Observed Scanner Evidence</h3>
@@ -217,6 +220,36 @@ export class TaskDetail extends HTMLElement {
       });
     }
   }
+}
+
+/**
+ * Renders the task's resolved technology context and any ADDITIVE
+ * technology-specific guidance. The generic HTML objective is shown elsewhere and
+ * always applies; this only adds framework context when defensibly known.
+ */
+function renderTaskTechnology(task) {
+  const tc = task.technologyContext;
+  const guidance = task.blueprint?.technologyGuidance;
+  if (!tc || tc.name === 'Unknown') {
+    return `<div style="margin-bottom: var(--space-6); font-size: var(--font-size-sm); color: var(--color-text-muted);">
+      <strong>Technology context:</strong> Unknown — framework-neutral HTML guidance applies. Set a technology on the Roles &amp; Context page to tailor guidance.
+    </div>`;
+  }
+  const evidence = Array.isArray(tc.evidence) ? tc.evidence : [];
+  return `
+    <div style="margin-bottom: var(--space-6);">
+      <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Technology Context</h3>
+      <p style="font-size: var(--font-size-sm);">
+        <strong>${escapeHtml(tc.name)}</strong>${tc.category ? ` (${escapeHtml(tc.category)})` : ''}
+        — ${tc.confirmed ? 'confirmed by you' : `${escapeHtml(tc.confidence)} confidence, source: ${escapeHtml(tc.source)}`}
+      </p>
+      ${evidence.length ? `<ul style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-left: var(--space-4);">${evidence.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>` : ''}
+      ${guidance ? `<div style="margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background-color: var(--color-bg-subtle); border-radius: var(--radius-sm); font-size: var(--font-size-sm);">
+        <strong>${escapeHtml(guidance.technology)} note (${escapeHtml(guidance.basis)}):</strong> ${escapeHtml(guidance.note)}
+        <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">This extends — does not replace — the framework-neutral guidance above.</div>
+      </div>` : ''}
+    </div>
+  `;
 }
 
 customElements.define('task-detail', TaskDetail);

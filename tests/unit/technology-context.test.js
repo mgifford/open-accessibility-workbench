@@ -74,6 +74,68 @@ describe('Phase 8: weak evidence and confidence', () => {
   });
 });
 
+describe('Phase 8 hardening: confidence normalization & preservation', () => {
+  test('numeric AND string low confidence both stay low and yield no guidance', () => {
+    const numeric = detectTechnologyFromObservations([], null, { technologies: [{ name: 'React', confidence: 1, evidence: ['x'] }] });
+    assert.equal(numeric.confidence, 'low');
+    assert.equal(getTechnologyGuidance('accessible-name', numeric), null);
+
+    const string = detectTechnologyFromObservations([], null, { technologies: [{ name: 'React', confidence: 'low', evidence: ['x'] }] });
+    assert.equal(string.confidence, 'low'); // was incorrectly 'high'
+    assert.equal(getTechnologyGuidance('accessible-name', string), null);
+  });
+
+  test('imported detector confidence is honoured, not forced to medium', () => {
+    const low = detectTechnologyFromObservations([], null, { detectorResults: [{ name: 'React', confidence: 1 }] });
+    assert.equal(low.confidence, 'low');
+    assert.equal(getTechnologyGuidance('accessible-name', low), null);
+
+    const high = detectTechnologyFromObservations([], null, { detectorResults: [{ name: 'React', confidence: 95 }] });
+    assert.equal(high.confidence, 'high');
+    assert.ok(getTechnologyGuidance('accessible-name', high));
+  });
+
+  test('every imported technology is preserved, not just the selected one', () => {
+    const ctx = detectTechnologyFromObservations([], null, {
+      technologies: [{ name: 'Drupal', confidence: 100 }, { name: 'Twig', confidence: 90 }, { name: 'React', confidence: 60 }]
+    });
+    assert.equal(ctx.name, 'Drupal'); // selected
+    assert.deepEqual(ctx.allTechnologies.map(t => t.name), ['Drupal', 'Twig', 'React']);
+  });
+});
+
+describe('Phase 8 hardening: exports carry technology context + guidance', () => {
+  const t = detectTechnologyFromObservations([], 'Drupal');
+  const task = {
+    id: 'T1', title: 'Fix names', ruleId: 'link-name', ruleIds: ['link-name'], remediationFamily: 'accessible-name',
+    wcag: ['2.4.4'], urgency: 'high', leverage: 'high', metrics: { affectedPagesCount: 1, observationCount: 1 },
+    roles: { primary: 'Content Authoring', secondary: [], source: 'w3c-arrm' }, technologyContext: t,
+    blueprint: generateRemediationBlueprint({ ruleId: 'link-name', cluster: {}, technologyContext: t, remediationFamily: 'accessible-name' }),
+    affectedPages: [], observations: []
+  };
+
+  test('Markdown export includes technology context and additive guidance', async () => {
+    const { exportTasksToMarkdown } = await import('../../src/export/markdown.js');
+    const md = exportTasksToMarkdown({ tasks: [task], observations: [], sourceSummary: {} });
+    assert.match(md, /Technology Context.*Drupal/);
+    assert.match(md, /Drupal note/);
+  });
+
+  test('GitHub issue export includes technology context', async () => {
+    const { formatGitHubIssue } = await import('../../src/export/github-issue.js');
+    const gh = formatGitHubIssue(task);
+    assert.match(gh, /Technology Context.*Drupal/);
+  });
+
+  test('JSON-LD export includes technology context and guidance', async () => {
+    const { exportTasksToJsonLd } = await import('../../src/export/jsonld.js');
+    const ld = JSON.parse(exportTasksToJsonLd({ tasks: [task], observations: [], sourceSummary: {} }));
+    const exported = ld.remediationTasks[0];
+    assert.equal(exported.technologyContext.name, 'Drupal');
+    assert.ok(exported.actionableBlueprint.technologyGuidance);
+  });
+});
+
 describe('Phase 8: rejection and metadata compatibility', () => {
   test('a rejected detection is not re-applied', () => {
     // Reject Drupal; the same report evidence must not re-detect it.
