@@ -3,6 +3,7 @@ import { parseOpenScansReportJson } from '../adapters/open-scans/report-json.js'
 import { parseOpenScansOverlapJson } from '../adapters/open-scans/overlap-json.js';
 import { parseOpenScansReportCsv } from '../adapters/open-scans/report-csv.js';
 import { parseOobeeReportCsv } from '../adapters/oobee/report-csv.js';
+import { ingestSummaryFormat } from '../adapters/summary-ingest.js';
 import { decompressGzipB64 } from '../adapters/oobee/decompress.js';
 import { enrichObservationsWithSignatures } from '../analysis/canonicalize.js';
 import { clusterPatternOccurrences } from '../analysis/pattern-cluster.js';
@@ -135,6 +136,26 @@ export class ReportLoader extends HTMLElement {
         return;
       }
 
+      // Aggregate / summary formats do not carry finding-level evidence, so
+      // they are stored as a summary the overview renders directly rather than
+      // being pushed through the pattern/task pipeline.
+      const summaryData = ingestSummaryFormat(detection, content);
+      if (summaryData) {
+        workspaceStore.setState({
+          loaded: true,
+          sourceSummary: { system: detection.system, format: detection.format, filename, granularity: summaryData.granularity },
+          observations: [],
+          clusters: [],
+          hypotheses: [],
+          tasks: [],
+          overlapData: detection.type === REPORT_TYPES.OPEN_SCANS_OVERLAP_JSON ? summaryData.overlap : null,
+          summaryData,
+          statusMessage: `Summary report loaded (${detection.format}).`
+        });
+        window.location.hash = '#/overview';
+        return;
+      }
+
       let observations = [];
       let totalPages = 1;
       let rawTotals = null;
@@ -197,6 +218,7 @@ export class ReportLoader extends HTMLElement {
         hypotheses,
         tasks,
         overlapData,
+        summaryData: null,
         statusMessage: `Report loaded. ${observations.length} observations analyzed into ${tasks.length} remediation tasks.`
       });
 

@@ -89,8 +89,120 @@ export class ReportOverview extends HTMLElement {
     `;
   }
 
+  /**
+   * Renders a useful overview for aggregate/summary reports (the four Oobee
+   * summary JSONs and a standalone Open Scans overlap report), which carry no
+   * finding-level evidence. All report-derived text is escaped.
+   */
+  renderSummaryView(s, sourceSummary, overlapData) {
+    const header = `
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" style="font-size: var(--font-size-2xl);">Scan Summary</h2>
+          <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+            Source: <strong>${escapeHtml(sourceSummary?.system) || 'Unknown'}</strong> — ${escapeHtml(s.format)}
+          </p>
+        </div>
+        <a href="#/import" class="btn btn-secondary">Import another report</a>
+      </div>
+      <div class="card" style="background-color: var(--color-brand-bg); border-left: 4px solid var(--color-brand-primary); margin-bottom: var(--space-6);">
+        This is an <strong>aggregate summary</strong> report. It has no finding-level
+        selectors or HTML, so it is shown as counts rather than remediation tasks.
+        Load a finding-level report (Open Scans <code>report.json</code> or Oobee
+        <code>report.csv</code>) to generate remediation tasks.
+      </div>
+    `;
+
+    let body = '';
+    if (s.kind === 'oobee-items') {
+      const c = s.severityCounts;
+      body = `
+        <div class="card">
+          <h3 class="card-title">Issue counts by severity</h3>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); margin-top: var(--space-3);">
+              <caption class="sr-only">Oobee item counts by severity category</caption>
+              <thead><tr style="text-align: left; border-bottom: 2px solid var(--color-border);">
+                <th scope="col" style="padding: var(--space-2);">Severity category</th>
+                <th scope="col" style="padding: var(--space-2); text-align: right;">Items</th>
+              </tr></thead>
+              <tbody>
+                <tr style="border-bottom: 1px solid var(--color-border);"><th scope="row" style="padding: var(--space-2);">Must fix</th><td style="padding: var(--space-2); text-align: right;">${c.mustFix}</td></tr>
+                <tr style="border-bottom: 1px solid var(--color-border);"><th scope="row" style="padding: var(--space-2);">Good to fix</th><td style="padding: var(--space-2); text-align: right;">${c.goodToFix}</td></tr>
+                <tr style="border-bottom: 1px solid var(--color-border);"><th scope="row" style="padding: var(--space-2);">Needs review</th><td style="padding: var(--space-2); text-align: right;">${c.needsReview}</td></tr>
+                <tr style="font-weight: 700;"><th scope="row" style="padding: var(--space-2);">Total</th><td style="padding: var(--space-2); text-align: right;">${s.totalItems}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <dl style="display: flex; gap: var(--space-6); flex-wrap: wrap; margin-top: var(--space-4);">
+            ${s.totalPagesScanned != null ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Pages scanned</dt><dd style="font-weight: 600;">${s.totalPagesScanned}</dd></div>` : ''}
+            ${s.wcagPassPercentage != null ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">WCAG pass</dt><dd style="font-weight: 600;">${s.wcagPassPercentage}%</dd></div>` : ''}
+          </dl>
+        </div>
+      `;
+    } else if (s.kind === 'oobee-issues') {
+      body = `
+        <div class="card">
+          <h3 class="card-title">Rules by severity (${s.issues.length})</h3>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); margin-top: var(--space-3);">
+              <caption class="sr-only">Oobee rules grouped by severity</caption>
+              <thead><tr style="text-align: left; border-bottom: 2px solid var(--color-border);">
+                <th scope="col" style="padding: var(--space-2);">Rule</th>
+                <th scope="col" style="padding: var(--space-2);">Severity</th>
+                <th scope="col" style="padding: var(--space-2); text-align: right;">Items</th>
+              </tr></thead>
+              <tbody>
+                ${s.issues.map(i => `
+                  <tr style="border-bottom: 1px solid var(--color-border);">
+                    <th scope="row" style="padding: var(--space-2); font-weight: 600;">${escapeHtml(i.rule || i.issueId || '—')}</th>
+                    <td style="padding: var(--space-2);">${escapeHtml(i.category || '—')}</td>
+                    <td style="padding: var(--space-2); text-align: right;">${escapeHtml(i.totalItems ?? '—')}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    } else if (s.kind === 'oobee-pages') {
+      body = `
+        <div class="card">
+          <h3 class="card-title">Pages scanned</h3>
+          <dl style="display: flex; gap: var(--space-6); flex-wrap: wrap; margin: var(--space-3) 0;">
+            <div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Scanned</dt><dd style="font-weight: 600;">${s.scannedPagesCount}</dd></div>
+            <div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">With issues</dt><dd style="font-weight: 600;">${s.pagesAffected.length}</dd></div>
+            <div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Without issues</dt><dd style="font-weight: 600;">${s.pagesNotAffected.length}</dd></div>
+            <div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Not scanned</dt><dd style="font-weight: 600;">${s.pagesNotScanned.length}</dd></div>
+          </dl>
+          ${s.pagesAffected.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary);">Pages with issues:</p>
+          <ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${s.pagesAffected.slice(0, 20).map(p => `<li>${escapeHtml(p.pageTitle || p.url || p)}</li>`).join('')}</ul>` : ''}
+        </div>
+      `;
+    } else if (s.kind === 'oobee-pages-detail') {
+      body = `
+        <div class="card">
+          <h3 class="card-title">Per-page issue breakdown (${s.pages.length} pages)</h3>
+          <ul style="font-size: var(--font-size-sm); margin-left: var(--space-4); margin-top: var(--space-3);">
+            ${s.pages.slice(0, 20).map(p => `
+              <li style="margin-bottom: var(--space-2);">
+                <strong>${escapeHtml(p.pageTitle || p.url || '(page)')}</strong>
+                ${Array.isArray(p.typesOfIssues) ? ` — ${p.typesOfIssues.length} issue type(s)` : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      `;
+    } else if (s.kind === 'open-scans-overlap') {
+      // Reuse the scan-summary table renderer with just the overlap data.
+      body = this.renderScanSummary({ system: sourceSummary?.system, engines: s.overlap.scannersInUse }, s.overlap);
+    }
+
+    return `<section>${header}${body}</section>`;
+  }
+
   render() {
-    const { loaded, observations, clusters, hypotheses, tasks, sourceSummary, overlapData } = workspaceStore.state;
+    const { loaded, observations, clusters, hypotheses, tasks, sourceSummary, overlapData, summaryData } = workspaceStore.state;
     const { selectedCapabilities } = profileStore.state;
 
     if (!loaded) {
@@ -101,6 +213,13 @@ export class ReportOverview extends HTMLElement {
           <a href="#/import" class="btn btn-primary">Go to Import</a>
         </section>
       `;
+      return;
+    }
+
+    // Aggregate/summary reports carry no finding-level evidence, so render a
+    // dedicated summary view instead of the reduction/task pipeline.
+    if (summaryData) {
+      this.innerHTML = this.renderSummaryView(summaryData, sourceSummary, overlapData);
       return;
     }
 
