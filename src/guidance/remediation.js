@@ -4,6 +4,7 @@
 
 import { getTechnologyGuidance } from './technology-guidance.js';
 import { getExactRuleGuidance } from './exact-rule.js';
+import { retrieveGuidance } from './retrieve.js';
 
 /** Decision concern -> the role that typically makes it (guidance, not ownership). */
 const DECISION_ROLE = {
@@ -126,6 +127,11 @@ export function generateRemediationBlueprint(taskMeta) {
     likelyRootCause,
     whatNeedsToChange,         // always framework-neutral
     remediationFamily: family,
+    // Retrieved guidance for this task (deterministic order), each item with its
+    // source, licence, framework, match type, and retrieval reason (spec §10.6).
+    // The blueprint shows which guidance was selected and why; retrieval never
+    // silently becomes remediation advice.
+    retrievedGuidance: retrieveGuidance({ ruleId, wcag, technologyContext }).results.slice(0, 4),
     humanDecisionsRequired,    // string[] (back-compat)
     humanDecisions,            // structured (spec §9.4)
     ruleGuidance,              // curated guidance with provenance (spec §9.1)

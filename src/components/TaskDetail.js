@@ -112,6 +112,9 @@ export class TaskDetail extends HTMLElement {
             </div>
           ` : ''}
 
+          <!-- Retrieved Guidance (deterministic order; every item shows provenance + reason) -->
+          ${renderRetrievedGuidance(task.blueprint?.retrievedGuidance)}
+
           <!-- Technology Context (additive; framework-neutral guidance always applies) -->
           ${renderTaskTechnology(task)}
 
@@ -241,6 +244,40 @@ export class TaskDetail extends HTMLElement {
  * technology-specific guidance. The generic HTML objective is shown elsewhere and
  * always applies; this only adds framework context when defensibly known.
  */
+/**
+ * Renders retrieved guidance with full provenance and the reason each item was
+ * retrieved (spec §10.6). Retrieval is shown as reference material — clearly
+ * distinct from the task's own remediation blueprint — and never silently
+ * becomes the recommendation.
+ */
+function renderRetrievedGuidance(items) {
+  if (!Array.isArray(items) || items.length === 0) return '';
+  return `
+    <div style="margin-bottom: var(--space-6);">
+      <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Retrieved Guidance</h3>
+      <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-bottom: var(--space-2);">Reference material retrieved locally, in precedence order. Review before applying.</p>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-2);">
+        ${items.map(g => `
+          <li style="border-left: 3px solid var(--color-border); padding: var(--space-2) var(--space-3); background-color: var(--color-bg-subtle); border-radius: var(--radius-sm);">
+            <div style="font-weight: 600; font-size: var(--font-size-sm);">${escapeHtml(g.title)}
+              <span class="badge badge-medium" style="margin-left: var(--space-2);">${escapeHtml(g.matchType)}</span>
+              ${g.appliesToConfirmedTech === true ? '<span class="badge badge-low" style="margin-left: var(--space-1);">applies to your technology</span>' : ''}
+            </div>
+            <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-1);">${escapeHtml(g.text)}</div>
+            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
+              Retrieved because: ${escapeHtml((g.retrievalReason || []).join('; '))}
+            </div>
+            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+              Source: ${g.sourceUrl ? `<a href="${escapeAttr(g.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(g.source)}</a>` : escapeHtml(g.source)}
+              &bull; ${escapeHtml(g.framework || 'framework-neutral')} &bull; ${escapeHtml(g.license)}${g.revision ? ` &bull; ${escapeHtml(g.revision)}` : ''}
+            </div>
+          </li>
+        `).join('')}
+      </ul>
+    </div>
+  `;
+}
+
 function renderTaskTechnology(task) {
   const tc = task.technologyContext;
   const guidance = task.blueprint?.technologyGuidance;
