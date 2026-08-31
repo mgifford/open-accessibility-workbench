@@ -13,6 +13,7 @@ import './components/AiAdvisor.js';
 import './components/ModelStatus.js';
 import './components/ValidationResults.js';
 import './components/ExportPanel.js';
+import './components/LocalDataControls.js';
 import { Router } from './router.js';
 import { workspaceStore } from './state/workspace.js';
 import { technologyStore } from './state/technology.js';
@@ -47,6 +48,7 @@ const routes = {
           <li>Full Data Provenance: every aggregate task traces back to its scanner evidence.</li>
         </ul>
       </div>
+      <local-data-controls></local-data-controls>
     </section>
   `
 };

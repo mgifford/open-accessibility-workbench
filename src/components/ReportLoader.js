@@ -11,6 +11,7 @@ import { buildComponentHypotheses } from '../analysis/component-hypothesis.js';
 import { buildRemediationTasks } from '../analysis/remediation-tasks.js';
 import { makeSourceReport } from '../analysis/source-registry.js';
 import { technologyStore } from '../state/technology.js';
+import { checkFileSize } from '../utils/input-limits.js';
 import { workspaceStore } from '../state/workspace.js';
 
 export class ReportLoader extends HTMLElement {
@@ -141,6 +142,13 @@ export class ReportLoader extends HTMLElement {
   processFileContent(content, filename, overlapContent = null) {
     const errorBox = this.querySelector('#error-container');
     errorBox.style.display = 'none';
+
+    // Guard against gigantic input before doing expensive work (spec §13.3).
+    const sizeCheck = checkFileSize(content);
+    if (!sizeCheck.ok) {
+      this.showError(sizeCheck.error);
+      return;
+    }
 
     try {
       const detection = detectReportSource(content, filename);

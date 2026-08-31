@@ -4,6 +4,7 @@
  */
 
 import { parseWcagTags, wcagLevelFromTags } from '../../utils/wcag-tags.js';
+import { capField } from '../../utils/input-limits.js';
 
 /**
  * @param {object} openScansReport
@@ -79,7 +80,7 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
             },
             evidence: {
               description: failure.message || '',
-              renderedHtml: failure.html || '',
+              renderedHtml: capField(failure.html || ''),
               locator: failure.xpath || '',
               locatorType: failure.xpath?.startsWith('/') ? 'xpath' : 'selector',
               scannerGuidance: failure.fixSummary || '',

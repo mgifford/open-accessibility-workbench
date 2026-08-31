@@ -4,6 +4,7 @@
  */
 
 import { parseWcagTags, wcagLevelFromTags } from '../../utils/wcag-tags.js';
+import { capField } from '../../utils/input-limits.js';
 
 /**
  * @param {Array<Record<string, string>>} oobeeRecords
@@ -79,7 +80,7 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
       },
       evidence: {
         description: row.issueDescription || '',
-        renderedHtml: row.context || '',
+        renderedHtml: capField(row.context || ''),
         locator: row.xpath || '',
         locatorType: 'xpath',
         scannerGuidance: row.howToFix || '',
