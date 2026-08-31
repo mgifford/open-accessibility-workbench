@@ -25,7 +25,7 @@ Responsibilities Mapping (ARRM), plus data derived from it by the Workbench.
 
 | File | What it is |
 | --- | --- |
-| `arrm-wcag-sc.csv` | **Raw snapshot**, verbatim from upstream. The source of truth. |
+| `arrm-wcag-sc.csv` | **Content-equivalent snapshot** of upstream (CRLF normalized to LF; values unchanged). The source of truth. |
 | `wcag-role-map.json` | Generated from the CSV by `scripts/build-arrm-data.js`. |
 | `roles.json` | The 5 real ARRM roles + 1 Workbench extension role, tagged by `source`. |
 | `metadata.json` | Provenance for the generated data. |

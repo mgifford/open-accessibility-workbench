@@ -3,6 +3,17 @@ import { profileStore } from '../state/profile.js';
 import { routeTaskForProfile } from '../roles/route-task.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 import { taskStatusStore, TASK_STATUSES, TASK_STATUS_LABELS } from '../state/task-status.js';
+import { renderRoleGuidance } from '../roles/render-role-guidance.js';
+
+/** Decision concern a remediation family requires (mirrors route-task.js). */
+const DECISION_CONCERN = {
+  'accessible-name': 'content',
+  'text-alternative': 'content',
+  'contrast': 'contrast',
+  'structure': 'structure',
+  'form-labeling': 'content',
+  'target-size': 'visual'
+};
 
 export class TaskList extends HTMLElement {
   constructor() {
@@ -37,15 +48,19 @@ export class TaskList extends HTMLElement {
     // Pre-compute each task's routing verdict once (deterministic, no mutation).
     const routed = tasks.map(t => ({ task: t, route: routeTaskForProfile(t, selectedCapabilities) }));
 
-    // Role-aware views (spec §7.6). Each is a reversible filter; nothing is
-    // deleted, and the hidden count is shown below.
+    // Role-aware views (spec §7.6). Predicates reflect ACTUAL workflow data — a
+    // task's remediation-family decision concern, its unresolved decisions, and
+    // its lifecycle status — not merely which role appears somewhere. Each is a
+    // reversible filter; nothing is deleted, and the hidden count is shown below.
+    const decisionConcern = (t) => DECISION_CONCERN[t.remediationFamily] || null;
+    const hasUnresolvedDecision = (t) => (t.blueprint?.humanDecisionsRequired?.length || 0) > 0;
     const viewPredicates = {
       'all': () => true,
       'relevant': ({ route }) => route.relevance !== 'handoff',
-      'needs-content': ({ task }) => roleInvolved(task, 'Content'),
-      'needs-design': ({ task }) => roleInvolved(task, 'Visual Design') || roleInvolved(task, 'UX'),
-      'ready-dev': ({ task }) => roleInvolved(task, 'Development'),
-      'needs-a11y-review': ({ task }) => (task.blueprint?.humanDecisionsRequired?.length || 0) > 0 || roleInvolved(task, 'Testing'),
+      'needs-content': ({ task }) => hasUnresolvedDecision(task) && decisionConcern(task) === 'content',
+      'needs-design': ({ task }) => hasUnresolvedDecision(task) && ['contrast', 'visual', 'structure', 'behavior'].includes(decisionConcern(task)),
+      'ready-dev': ({ task }) => taskStatusStore.get(task.id) === 'ready' && !hasUnresolvedDecision(task),
+      'needs-a11y-review': ({ task }) => taskStatusStore.get(task.id) === 'needs-verification',
       'ready-verification': ({ task }) => taskStatusStore.get(task.id) === 'needs-verification',
       'needs-another-role': ({ route }) => route.relevance === 'handoff'
     };
@@ -185,6 +200,7 @@ export class TaskList extends HTMLElement {
       viewSelect.addEventListener('change', (e) => {
         this.filterView = e.target.value;
         this._pendingAnnounce = `View changed to ${e.target.options[e.target.selectedIndex].text}.`;
+        this._restoreFocusId = 'filter-view';
         this.render();
       });
     }
@@ -192,6 +208,7 @@ export class TaskList extends HTMLElement {
     if (urgencySelect) {
       urgencySelect.addEventListener('change', (e) => {
         this.filterUrgency = e.target.value;
+        this._restoreFocusId = 'filter-urgency';
         this.render();
       });
     }
@@ -200,6 +217,7 @@ export class TaskList extends HTMLElement {
     if (statusSelect) {
       statusSelect.addEventListener('change', (e) => {
         this.filterStatus = e.target.value;
+        this._restoreFocusId = 'filter-status';
         this.render();
       });
     }
@@ -246,6 +264,14 @@ export class TaskList extends HTMLElement {
       this._restoreFocusTaskId = null;
     }
 
+    // Restore focus to a filter control after a filter-driven re-render, so a
+    // keyboard/SR user keeps their place (spec §7.4: no lost focus).
+    if (this._restoreFocusId) {
+      const el = this.querySelector(`#${CSS.escape(this._restoreFocusId)}`);
+      if (el) el.focus();
+      this._restoreFocusId = null;
+    }
+
     // Announce applied filter / status change politely, WITHOUT moving focus for
     // filter changes (spec §7.4).
     if (this._pendingAnnounce) {
@@ -261,16 +287,6 @@ export class TaskList extends HTMLElement {
  * distinctions (spec §7.2) — never as organizational ownership — and labels the
  * source (W3C ARRM vs Workbench inference, spec §7.3).
  */
-function renderRoleGuidance(roles = {}) {
-  const parts = [];
-  if (roles.primary) parts.push(`<strong>Likely primary role:</strong> ${escapeHtml(roles.primary)}`);
-  if (roles.coPrimary && roles.coPrimary.length) parts.push(`<strong>Also primary:</strong> ${escapeHtml(roles.coPrimary.join(', '))}`);
-  if (roles.secondary && roles.secondary.length) parts.push(`<strong>Likely secondary role:</strong> ${escapeHtml(roles.secondary.join(', '))}`);
-  if (roles.contributors && roles.contributors.length) parts.push(`<strong>Possible contributor:</strong> ${escapeHtml(roles.contributors.join(', '))}`);
-  const sourceLabel = roles.source === 'w3c-arrm' ? 'W3C ARRM' : 'Workbench inference';
-  return `${parts.join(' &bull; ')} <span style="color: var(--color-text-muted);">(${sourceLabel})</span>`;
-}
-
 /**
  * Renders the capability-routing verdict for a task. Relevance is communicated
  * with a text label and a reason — not colour alone (spec §7.4).
@@ -279,9 +295,10 @@ function renderRelevance(route) {
   if (!route || route.relevance === 'unfiltered') return '';
   const labels = {
     'direct': 'Direct — you can act on this',
-    'supporting': 'Supporting — you can help',
+    'decision': 'You can make the required decision',
+    'implementation-blocked': 'Implementation work — blocked by a decision',
     'review-only': 'Review only',
-    'handoff': 'Needs another role — prepare a handoff'
+    'handoff': 'Likely needs another role — prepare a handoff'
   };
   const label = labels[route.relevance] || route.relevance;
   const reasons = (route.reason || []).map(r => `<li>${escapeHtml(r)}</li>`).join('');

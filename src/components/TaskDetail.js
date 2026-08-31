@@ -3,6 +3,7 @@ import { formatGitHubIssue } from '../export/github-issue.js';
 import { runValidationSuite } from '../validation/registry.js';
 import { requestAiRemediation } from '../ai/client.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
+import { renderRoleGuidance as renderRoleGuidanceDetail } from '../roles/render-role-guidance.js';
 
 export class TaskDetail extends HTMLElement {
   constructor() {
@@ -92,14 +93,8 @@ export class TaskDetail extends HTMLElement {
             </div>
 
             <div style="background-color: var(--color-bg-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
-              <strong style="font-size: var(--font-size-xs); text-transform: uppercase; color: var(--color-text-secondary);">Role Guidance (ARRM)</strong>
-              <div style="font-size: var(--font-size-base); font-weight: 700; margin-top: var(--space-1);">${escapeHtml(task.roles.primary)}</div>
-              <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-1);">
-                Supporting: ${escapeHtml(task.roles.secondary.join(', ')) || 'None'}
-              </div>
-              <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
-                Source: ${escapeHtml(task.roles.source)}
-              </div>
+              <strong style="font-size: var(--font-size-xs); text-transform: uppercase; color: var(--color-text-secondary);">Role Guidance</strong>
+              ${renderRoleGuidanceDetail(task.roles, { detailed: true })}
             </div>
           </div>
 

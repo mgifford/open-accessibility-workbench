@@ -25,9 +25,32 @@ in `public/data/arrm/`). ARRM is an **in-progress draft** — guidance, not dogm
 ---
 
 ## 2. Responsibility Levels
-- **Primary**: Role accountable for authoring or implementing the change.
-- **Secondary**: Role directly supporting or co-authoring the change.
-- **Contributor**: Role consulted for verification or input.
+ARRM assigns, per success criterion, one of three involvement levels — **guidance
+for routing, not organizational ownership or accountability**:
+- **Primary**: role most likely to lead the work.
+- **Secondary**: role likely to support it.
+- **Contributor**: role likely consulted or providing verification/input.
+
+Routing **aggregates across all matched success criteria** for a finding, so the
+result does not depend on criterion order, and every assignment keeps
+criterion-level provenance (`{ wcag, role, responsibility, source, sourceUrl,
+snapshotDate, license }`). ARRM and Workbench-extension assignments keep distinct
+sources; a task's overall `roles.source` is `w3c-arrm`, `mixed`, or `unmapped`.
+
+When **no** ARRM or curated Workbench mapping covers a finding, routing returns
+**no primary role** and `needsAccessibilityTriage: true` — it never invents an
+owner.
+
+## 2a. Capability facets: decide vs implement vs verify
+A capability may grant different facets: the authority to **make a decision**
+(e.g. choose an accessible colour, write link text), the ability to **implement**
+an approved change (e.g. edit CSS tokens, edit a template), or the ability to
+**verify** the result. These are distinct: a CSS-only user can *implement* a
+colour token but does not *decide* the accessible colour. Routing therefore
+returns verdicts like `decision`, `implementation-blocked`, `direct`,
+`review-only`, or `handoff`, and never conflates implementation ability with
+decision authority. Language is non-ownership ("likely primary role involvement",
+"completion likely requires input from …").
 
 ---
 

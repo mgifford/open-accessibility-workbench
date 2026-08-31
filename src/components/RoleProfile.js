@@ -52,6 +52,9 @@ export class RoleProfile extends HTMLElement {
     const checkboxes = this.querySelectorAll('input[type="checkbox"]');
     checkboxes.forEach(cb => {
       cb.addEventListener('change', () => {
+        // Re-rendering replaces the checkbox; remember it so we can restore focus
+        // after the store notifies and re-renders (spec §7.4: keep focus).
+        this._restoreFocusId = cb.id;
         profileStore.toggleCapability(cb.value);
       });
     });
@@ -59,8 +62,16 @@ export class RoleProfile extends HTMLElement {
     const clearBtn = this.querySelector('#clear-profile-btn');
     if (clearBtn) {
       clearBtn.addEventListener('click', () => {
+        this._restoreFocusId = 'clear-profile-btn';
         profileStore.setCapabilities([]);
       });
+    }
+
+    // Restore focus to the control the user just operated.
+    if (this._restoreFocusId) {
+      const el = this.querySelector(`#${CSS.escape(this._restoreFocusId)}`);
+      if (el) el.focus();
+      this._restoreFocusId = null;
     }
   }
 }

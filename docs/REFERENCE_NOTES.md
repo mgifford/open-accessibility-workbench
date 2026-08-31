@@ -75,7 +75,7 @@ earlier per-adapter regex incorrectly produced tokens like `"2aa"`.
 
 ## 2. Oobee (GovTech Singapore)
 
-Inspected: `DETAILS.md`, `REPORTS.md` (oobee `master`, `a3d7b75ec526`). Exact
+Inspected: `DETAILS.md`, `REPORTS.md` (oobee `master`, `3d7b75ec5267`). Exact
 JSON/CSV shapes and the detector/adapter contract are recorded in
 `tests/fixtures/oobee/FIXTURE_MANIFEST.md`; only the semantics are summarised
 here.
@@ -114,7 +114,7 @@ Oobee's `wcagConformance` column is comma-joined tokens of the same
 ## 3. Oobee Fix — architecture reference (not copied)
 
 Inspected: `README.md`, `SELF_VALIDATION.md` (oobee-fix `feat/local-pipeline`,
-`aa29f7d49a9c`). We adopt the *idea*, not the prompt or code.
+`a29f7d49a9cf`). We adopt the *idea*, not the prompt or code.
 
 ### Self-validation loop (verified counts)
 
@@ -147,8 +147,8 @@ embedding only the user's query locally.
 ## 4. W3C ARRM (Accessibility Roles and Responsibilities Mapping)
 
 Inspected: `_data/arrm/arrm-wcag-sc.csv` and the overview page (wai-arrm
-`draft`, `a80642c497e7`). A verbatim snapshot and full fidelity notes are in
-`public/data/arrm/SNAPSHOT.md`.
+`draft`, `80642c497e7f`). A content-equivalent snapshot (CRLF normalized to LF)
+and full fidelity notes are in `public/data/arrm/SNAPSHOT.md`.
 
 - **Status**: an **in-progress draft** produced by the W3C ARRM **Community
   Group** — guidance, not a Recommendation.
@@ -173,7 +173,7 @@ Inspected: `_data/arrm/arrm-wcag-sc.csv` and the overview page (wai-arrm
 
 ## 5. Technology fingerprinting (HTTP Archive Wappalyzer)
 
-Inspected: repository root (HTTPArchive/wappalyzer `main`, `acbafda14715`), used
+Inspected: repository root (HTTPArchive/wappalyzer `main`, `cbafda14715f`), used
 only as an **architectural** reference for signal types (DOM, meta tags, script
 sources, JS globals, headers, cookies, CSS, implied technologies).
 

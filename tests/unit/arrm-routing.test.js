@@ -24,43 +24,69 @@ describe('ARRM Role Routing & Capability Matching', () => {
     assert.ok(linkRole.coPrimary.includes('Front-End Development'));
   });
 
-  test('does not present Workbench inferences as W3C ARRM', () => {
-    // A success criterion ARRM does not cover must not be labelled w3c-arrm.
+  test('unmapped criteria are NOT given an invented owner', () => {
+    // A success criterion ARRM does not cover must not be labelled w3c-arrm and
+    // must NOT invent a primary role — it flags accessibility triage instead.
     const uncovered = getRolesForWcag(['9.9.9'], 'made-up-rule');
-    assert.equal(uncovered.source, 'workbench-inference');
-    assert.equal(uncovered.matchedSc, null);
-    assert.ok(uncovered.primary); // still offers a usable default owner
+    assert.equal(uncovered.source, 'unmapped');
+    assert.equal(uncovered.primary, null);
+    assert.equal(uncovered.needsAccessibilityTriage, true);
+    assert.deepEqual(uncovered.matchedSc, []);
+    assert.deepEqual(uncovered.unmatchedSc, ['9.9.9']);
 
-    // A finding with no WCAG data at all also falls back honestly.
+    // A finding with no WCAG data at all is also unmapped, not owned.
     const noWcag = getRolesForWcag([], 'region');
-    assert.equal(noWcag.source, 'workbench-inference');
+    assert.equal(noWcag.source, 'unmapped');
+    assert.equal(noWcag.primary, null);
+  });
+
+  test('all matched criteria contribute to routing (order-independent)', () => {
+    const a = getRolesForWcag(['1.4.3', '2.4.4']);
+    const b = getRolesForWcag(['2.4.4', '1.4.3']);
+    assert.equal(a.primary, b.primary);
+    assert.deepEqual([...a.coPrimary].sort(), [...b.coPrimary].sort());
+    // Both criteria appear in the matched set and in assignments.
+    assert.deepEqual([...a.matchedSc].sort(), ['1.4.3', '2.4.4']);
+    assert.ok(a.assignments.some(x => x.wcag === '1.4.3'));
+    assert.ok(a.assignments.some(x => x.wcag === '2.4.4'));
   });
 
   test('treats WCAG 2.2 criteria already in ARRM as ARRM, not an extension', () => {
     // ARRM's draft covers 2.5.8 (target size); it must be sourced as w3c-arrm.
     const targetSize = getRolesForWcag(['2.5.8'], 'target-size');
     assert.equal(targetSize.source, 'w3c-arrm');
-    assert.equal(targetSize.matchedSc, '2.5.8');
+    assert.ok(targetSize.matchedSc.includes('2.5.8'));
+    // Every assignment carries criterion-level provenance.
+    for (const asn of targetSize.assignments) {
+      assert.equal(asn.wcag, '2.5.8');
+      assert.ok(asn.responsibility);
+      assert.ok(asn.source);
+    }
   });
 
   test('filters task relevance based on active capability profile', () => {
     const contentTask = {
-      roles: { primary: 'Content Authoring', secondary: ['Front-End Development'] }
+      remediationFamily: 'accessible-name',
+      roles: { primary: 'Content Authoring', coPrimary: [], secondary: ['Front-End Development'], contributors: [] },
+      blueprint: { humanDecisionsRequired: ['Confirm the name.'] }
     };
     const designTask = {
-      roles: { primary: 'Visual Design', secondary: ['Front-End Development'] }
+      remediationFamily: 'contrast',
+      roles: { primary: 'Visual Design', coPrimary: [], secondary: ['Front-End Development'], contributors: [] },
+      blueprint: { humanDecisionsRequired: ['Choose the colour.'] }
     };
 
-    // User can edit content but not design/code
+    // Content user: can make the name decision (relevant); the contrast task
+    // needs a colour decision they cannot make and cannot implement -> handoff.
     const contentUser = ['Page content and media'];
     assert.equal(isTaskRelevantToProfile(contentTask, contentUser), true);
     assert.equal(isTaskRelevantToProfile(designTask, contentUser), false);
 
-    // User can edit CSS/tokens
+    // CSS user: can implement the contrast task (relevant, though decision-blocked).
     const cssUser = ['CSS/design tokens'];
     assert.equal(isTaskRelevantToProfile(designTask, cssUser), true);
 
-    // Review only user
+    // Review-only user: every task is shown for review.
     const reviewer = ['I can review but not change the site'];
     assert.equal(isTaskRelevantToProfile(contentTask, reviewer), true);
     assert.equal(isTaskRelevantToProfile(designTask, reviewer), true);

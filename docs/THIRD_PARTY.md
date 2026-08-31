@@ -11,7 +11,7 @@ This document outlines all third-party software, static datasets, and architectu
 | **Open Scans** | [mgifford/open-scans](https://github.com/mgifford/open-scans) (GPL-3.0) | Multi-engine scan report ingestion, pattern identities, overlap matrix. |
 | **Oobee** | [GovTechSG/oobee](https://github.com/GovTechSG/oobee) (GPL-3.0) | Finding CSV ingestion, summary JSON processing, severity classifications. |
 | **Oobee Fix** | [GovTechSG/oobee-fix](https://github.com/GovTechSG/oobee-fix) (GPL-3.0) | Multi-turn validation loop concept (Generate $\rightarrow$ Validate $\rightarrow$ Feedback $\rightarrow$ Retry). |
-| **W3C ARRM** | [W3C WAI ARRM](https://www.w3.org/WAI/planning/arrm/) (W3C Document License) | Role and task responsibility mappings by WCAG Success Criteria. |
+| **W3C ARRM** | [W3C WAI ARRM](https://www.w3.org/WAI/planning/arrm/) (CC BY 4.0, in-progress draft) | Role and task responsibility mappings by WCAG Success Criteria. |
 | **Wappalyzer (HTTPArchive)** | [HTTPArchive/wappalyzer](https://github.com/HTTPArchive/wappalyzer) (GPL-3.0) | Architectural reference for technology fingerprinting. Custom lightweight regex patterns used without vendoring full monolithic corpora. |
 | **Open Data Guide** | [mgifford/open-data-guide](https://github.com/mgifford/open-data-guide) | Architectural reference for client-side processing, privacy guarantees, and accessible data presentations. |
 

@@ -3,83 +3,129 @@
  *
  * The success-criterion → role mapping is a faithful parse of the W3C ARRM
  * matrix (w3c/wai-arrm, draft, CC-BY-4.0), generated into
- * `arrm-wcag-map.generated.js` by `scripts/build-arrm-data.js`. This module does
- * not hand-author mappings and does not present Workbench inferences as W3C
- * ARRM: when a success criterion is not covered by ARRM, the result is labelled
- * with an honest `source` other than `w3c-arrm`.
+ * `arrm-wcag-map.generated.js` by `scripts/build-arrm-data.js`.
+ *
+ * Routing aggregates role assignments across ALL matched success criteria (so
+ * the result is order-independent), and every assignment carries criterion-level
+ * provenance. Assignments from ARRM and from the Workbench extension keep
+ * distinct sources — the Workbench is never presented as W3C-authored. When no
+ * mapping covers a finding, the router returns no primary role and flags that
+ * accessibility triage is required, rather than inventing an owner.
  */
 
 import { ARRM_WCAG_MAP, ARRM_ROLES_BY_ID, ARRM_METADATA } from './arrm-wcag-map.generated.js';
 
 export { ARRM_METADATA };
 
-/** Canonical ARRM role identities (plus the Workbench Testing/QA extension). */
-export const ARRM_ROLES = Object.fromEntries(
-  Object.entries(ARRM_ROLES_BY_ID).map(([id, r]) => [
-    id.toUpperCase().replace(/-/g, '_'),
-    { id, name: r.name, arrm: r.arrm }
-  ])
-);
+/** ARRM draft status (see public/data/arrm/SNAPSHOT.md). */
+const ARRM_STATUS = 'draft';
+
+/** Provenance stamped on every ARRM-sourced assignment. */
+const ARRM_PROVENANCE = {
+  source: 'w3c-arrm',
+  sourceUrl: ARRM_METADATA.sourceUrl,
+  snapshotDate: ARRM_METADATA.snapshotDate,
+  arrmStatus: ARRM_STATUS,
+  license: ARRM_METADATA.license
+};
+
+/** Provenance for the Workbench Testing/QA extension role. */
+const EXTENSION_PROVENANCE = {
+  source: 'open-accessibility-workbench-extension',
+  sourceUrl: null,
+  snapshotDate: ARRM_METADATA.snapshotDate,
+  arrmStatus: null,
+  license: 'GPL-3.0-or-later',
+  basedOn: 'ARRM model'
+};
+
+const LEVEL_NAME = { P: 'primary', S: 'secondary', C: 'contributor' };
+const LEVEL_RANK = { primary: 3, secondary: 2, contributor: 1 };
 
 function roleName(id) {
   return ARRM_ROLES_BY_ID[id]?.name || id;
 }
 
-function toNames(ids = []) {
-  return ids.map(roleName);
+function isExtensionRole(id) {
+  return ARRM_ROLES_BY_ID[id]?.arrm === false;
 }
 
 /**
- * Resolves the likely roles for a finding from its WCAG success criteria.
+ * Resolves roles for a finding from ALL of its WCAG success criteria.
  *
- * @param {string[]} wcagCriteriaList - dotted success criteria, e.g. ["2.4.4"].
- * @param {string} [ruleId] - normalized rule id, used only for the honest
- *   fallback when no success criterion is covered by ARRM.
+ * @param {string[]} wcagCriteriaList - dotted success criteria, e.g. ["1.4.3","2.4.4"].
+ * @param {string} [ruleId] - normalized rule id (unused for routing; kept for API stability).
  * @returns {{
- *   primary: string|null,
- *   coPrimary: string[],
- *   secondary: string[],
- *   contributors: string[],
- *   source: 'w3c-arrm' | 'workbench-inference',
- *   matchedSc: string|null,
- *   wcagLevel: string|null
+ *   assignments: Array<{ wcag: string, roleId: string, role: string, responsibility: 'primary'|'secondary'|'contributor', source: string, sourceUrl: string|null, snapshotDate: string|null, arrmStatus: string|null, license: string }>,
+ *   primary: string|null, coPrimary: string[], secondary: string[], contributors: string[],
+ *   source: 'w3c-arrm' | 'mixed' | 'unmapped',
+ *   matchedSc: string[], unmatchedSc: string[],
+ *   needsAccessibilityTriage: boolean,
+ *   provenance: object
  * }}
  */
 export function getRolesForWcag(wcagCriteriaList = [], ruleId = '') {
-  let matched = null;
-  let matchedSc = null;
+  const criteria = Array.isArray(wcagCriteriaList) ? wcagCriteriaList : [];
+  const assignments = [];
+  const matchedSc = [];
+  const unmatchedSc = [];
 
-  for (const sc of wcagCriteriaList) {
-    if (ARRM_WCAG_MAP[sc]) {
-      matched = ARRM_WCAG_MAP[sc];
-      matchedSc = sc;
-      break;
+  // Aggregate assignments across EVERY matched criterion (order-independent).
+  for (const sc of criteria) {
+    const entry = ARRM_WCAG_MAP[sc];
+    if (!entry || !entry.roleLevels) { if (sc) unmatchedSc.push(sc); continue; }
+    matchedSc.push(sc);
+    for (const [roleId, levels] of Object.entries(entry.roleLevels)) {
+      for (const lvl of levels) {
+        assignments.push({
+          wcag: sc,
+          roleId,
+          role: roleName(roleId),
+          responsibility: LEVEL_NAME[lvl] || 'contributor',
+          ...(isExtensionRole(roleId) ? EXTENSION_PROVENANCE : ARRM_PROVENANCE)
+        });
+      }
     }
   }
 
-  if (matched) {
+  if (assignments.length === 0) {
+    // No ARRM or curated extension mapping. Do NOT invent an owner — flag for
+    // accessibility triage so a human determines the right role(s).
     return {
-      primary: matched.primary ? roleName(matched.primary) : null,
-      coPrimary: toNames(matched.coPrimary),
-      secondary: toNames(matched.secondary),
-      contributors: toNames(matched.contributors),
-      source: 'w3c-arrm',
-      matchedSc,
-      wcagLevel: matched.wcagLevel || null
+      assignments: [],
+      primary: null, coPrimary: [], secondary: [], contributors: [],
+      source: 'unmapped',
+      matchedSc: [], unmatchedSc: criteria.filter(Boolean),
+      needsAccessibilityTriage: true,
+      reason: 'No ARRM or curated Workbench mapping is available for these success criteria.',
+      provenance: null
     };
   }
 
-  // No ARRM coverage for this finding's success criteria. Provide a clearly
-  // labelled Workbench inference — never presented as W3C ARRM. Kept minimal
-  // and honest: front-end development is the safe default owner for a technical
-  // finding, with testing as a contributor.
+  // Reduce assignments to the highest responsibility each role holds anywhere.
+  const bestByRole = new Map();
+  for (const a of assignments) {
+    const cur = bestByRole.get(a.roleId);
+    if (!cur || LEVEL_RANK[a.responsibility] > LEVEL_RANK[cur]) bestByRole.set(a.roleId, a.responsibility);
+  }
+  const roleOrder = [...bestByRole.keys()].sort(); // deterministic
+  const primaries = roleOrder.filter(r => bestByRole.get(r) === 'primary');
+  const secondary = roleOrder.filter(r => bestByRole.get(r) === 'secondary').map(roleName);
+  const contributors = roleOrder.filter(r => bestByRole.get(r) === 'contributor').map(roleName);
+
+  const anyExtension = assignments.some(a => a.source !== 'w3c-arrm');
+  const source = anyExtension ? 'mixed' : 'w3c-arrm';
+
   return {
-    primary: roleName('frontend-dev'),
-    coPrimary: [],
-    secondary: [],
-    contributors: [roleName('qa-testing')],
-    source: 'workbench-inference',
-    matchedSc: null,
-    wcagLevel: null
+    assignments,
+    primary: primaries.length ? roleName(primaries[0]) : (secondary[0] || null),
+    coPrimary: primaries.slice(1).map(roleName),
+    secondary,
+    contributors,
+    source,
+    matchedSc,
+    unmatchedSc,
+    needsAccessibilityTriage: false,
+    provenance: ARRM_PROVENANCE
   };
 }

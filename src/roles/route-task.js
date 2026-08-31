@@ -1,44 +1,79 @@
 /**
  * Deterministic capability routing.
  *
- * Combines a task's ARRM role guidance (primary / secondary / contributor) with
- * the user's selected capabilities to produce a relevance verdict and an
- * explanation — WITHOUT changing the task's evidence. Capability selection
- * affects ordering, emphasis, filtering, and handoff only.
+ * Distinguishes three things a person's capabilities may let them do on a task:
+ *   - DECIDE      make the human decision the task requires (e.g. choose a colour,
+ *                 write link text) — decision authority;
+ *   - IMPLEMENT   carry out an approved change (e.g. edit CSS, edit a template);
+ *   - VERIFY      check the result (automated / manual / AT testing).
  *
- * Non-goals (spec §7 non-goals): this does not assign organizational or legal
- * ownership; ARRM is routing guidance, not a statement of who must do the work.
+ * Being able to implement a change is NOT the same as authority to make the
+ * decision behind it. A CSS-only user can implement a colour token but does not
+ * choose the accessible colour; they are relevant implementation work that is
+ * blocked by a design decision, not the decision-maker.
+ *
+ * Routing never changes a task's evidence — it only informs ordering, emphasis,
+ * filtering, and handoff. It is guidance, not organizational ownership.
  */
-
-/** Which capabilities let a person act in each ARRM role. */
-const ROLE_CAPABILITIES = {
-  'Content Authoring': ['Page content and media', 'CMS configuration'],
-  'Visual Design': ['Visual design', 'CSS/design tokens', 'Design systems/components'],
-  'User Experience (UX) Design': ['UX/interaction design', 'Product/business requirements'],
-  'Front-End Development': ['HTML/templates/components', 'CSS/design tokens', 'JavaScript/interactions', 'Design systems/components', 'CMS configuration'],
-  'Business': ['Product/business requirements', 'Governance/process'],
-  'Testing / QA': ['Automated/manual testing']
-};
-
-const REVIEW_ONLY = 'I can review but not change the site';
 
 /**
- * Returns the capabilities that let a person act in the given role name.
- * Uses substring matching so role display-name variants still resolve.
+ * Capability -> the facet(s) it grants. A capability may grant decision authority
+ * for some concerns, implementation for others, or verification.
  */
-function capabilitiesForRole(roleName) {
-  if (!roleName) return [];
-  for (const [name, caps] of Object.entries(ROLE_CAPABILITIES)) {
-    if (roleName.includes(name) || name.includes(roleName)) return caps;
-  }
-  // Fallbacks by keyword for looser role strings.
-  if (/content/i.test(roleName)) return ROLE_CAPABILITIES['Content Authoring'];
-  if (/visual/i.test(roleName)) return ROLE_CAPABILITIES['Visual Design'];
-  if (/ux|interaction/i.test(roleName)) return ROLE_CAPABILITIES['User Experience (UX) Design'];
-  if (/development|front-end|frontend/i.test(roleName)) return ROLE_CAPABILITIES['Front-End Development'];
-  if (/test|qa/i.test(roleName)) return ROLE_CAPABILITIES['Testing / QA'];
-  if (/business|governance|product/i.test(roleName)) return ROLE_CAPABILITIES['Business'];
-  return [];
+const CAPABILITY_FACETS = {
+  'Page content and media':      { decide: ['content'], implement: ['content'] },
+  'HTML/templates/components':   { implement: ['markup', 'structure'] },
+  'CSS/design tokens':           { implement: ['contrast', 'visual'] },
+  'JavaScript/interactions':     { implement: ['behavior'] },
+  'CMS configuration':           { implement: ['content', 'markup'] },
+  'Design systems/components':   { implement: ['visual', 'markup'] },
+  'Visual design':               { decide: ['contrast', 'visual'], implement: ['visual'] },
+  'UX/interaction design':       { decide: ['behavior', 'structure'] },
+  'Product/business requirements': { decide: ['product'] },
+  'Governance/process':          { decide: ['product'] },
+  'Automated/manual testing':    { verify: ['any'] },
+  'I can review but not change the site': { verify: ['any'] }
+};
+
+/**
+ * The decision concern a remediation family requires. Families not listed need
+ * no distinct decision beyond implementation.
+ */
+const FAMILY_DECISION = {
+  'accessible-name': 'content',   // what should the name say?
+  'text-alternative': 'content',  // what does the image convey?
+  'contrast': 'contrast',         // which accessible colour?
+  'structure': 'structure',       // which landmark/heading structure?
+  'form-labeling': 'content',
+  'target-size': 'visual'
+};
+
+/** The implementation concern a remediation family involves. */
+const FAMILY_IMPLEMENT = {
+  'accessible-name': 'markup',
+  'text-alternative': 'content',
+  'contrast': 'contrast',
+  'structure': 'markup',
+  'form-labeling': 'markup',
+  'target-size': 'visual'
+};
+
+function facetsFor(cap) {
+  return CAPABILITY_FACETS[cap] || {};
+}
+
+function grants(caps, facet, concern) {
+  return caps.some(c => {
+    const f = facetsFor(c)[facet];
+    return Array.isArray(f) && (f.includes(concern) || f.includes('any'));
+  });
+}
+
+function capsGranting(caps, facet, concern) {
+  return caps.filter(c => {
+    const f = facetsFor(c)[facet];
+    return Array.isArray(f) && (f.includes(concern) || f.includes('any'));
+  });
 }
 
 /**
@@ -47,74 +82,94 @@ function capabilitiesForRole(roleName) {
  * @param {object} task
  * @param {string[]} [userCapabilities]
  * @returns {{
- *   relevance: 'direct'|'supporting'|'review-only'|'handoff'|'unfiltered',
- *   matchedCapabilities: string[],
- *   unmatchedCapabilities: string[],
- *   reason: string[]
+ *   relevance: 'direct'|'implementation-blocked'|'decision'|'review-only'|'handoff'|'unfiltered',
+ *   matchedCapabilities: string[], unmatchedCapabilities: string[], reason: string[]
  * }}
  */
 export function routeTaskForProfile(task, userCapabilities = []) {
   const caps = Array.isArray(userCapabilities) ? userCapabilities : [];
-  const roles = task?.roles || {};
 
-  // No profile: everything is shown, unranked by capability.
   if (caps.length === 0) {
     return { relevance: 'unfiltered', matchedCapabilities: [], unmatchedCapabilities: [], reason: ['No capability profile selected; showing all tasks.'] };
   }
 
-  // Primary + coPrimary roles = "direct" work; secondary = "supporting";
-  // contributor = "review-only" involvement.
+  const family = task?.remediationFamily || task?.blueprint?.remediationFamily || null;
+  const decisionConcern = family ? FAMILY_DECISION[family] : null;
+  const implementConcern = family ? (FAMILY_IMPLEMENT[family] || 'markup') : 'markup';
+  const hasUnresolvedDecision = (task?.blueprint?.humanDecisionsRequired?.length || 0) > 0;
+
+  const canDecide = decisionConcern ? grants(caps, 'decide', decisionConcern) : false;
+  const canImplement = grants(caps, 'implement', implementConcern);
+  const canVerify = grants(caps, 'verify', 'any');
+
+  const matched = [
+    ...(decisionConcern ? capsGranting(caps, 'decide', decisionConcern) : []),
+    ...capsGranting(caps, 'implement', implementConcern),
+    ...capsGranting(caps, 'verify', 'any')
+  ];
+  const matchedSet = [...new Set(matched)];
+  const unmatched = caps.filter(c => !matchedSet.includes(c) && c !== 'I can review but not change the site');
+
+  const roles = task?.roles || {};
   const primaryRoles = [roles.primary, ...(roles.coPrimary || [])].filter(Boolean);
-  const secondaryRoles = roles.secondary || [];
-  const contributorRoles = roles.contributors || [];
-
-  const primaryCaps = new Set(primaryRoles.flatMap(capabilitiesForRole));
-  const secondaryCaps = new Set(secondaryRoles.flatMap(capabilitiesForRole));
-  const contributorCaps = new Set(contributorRoles.flatMap(capabilitiesForRole));
-
-  const matchedPrimary = caps.filter(c => primaryCaps.has(c));
-  const matchedSecondary = caps.filter(c => secondaryCaps.has(c) && !primaryCaps.has(c));
-  const matchedContributor = caps.filter(c => contributorCaps.has(c) && !primaryCaps.has(c) && !secondaryCaps.has(c));
-  const matched = [...matchedPrimary, ...matchedSecondary, ...matchedContributor];
-  const unmatched = caps.filter(c => !primaryCaps.has(c) && !secondaryCaps.has(c) && !contributorCaps.has(c) && c !== REVIEW_ONLY);
-
   const reason = [];
 
-  if (matchedPrimary.length > 0) {
-    reason.push(`You can act on the primary role for this task (${primaryRoles.join(', ')}).`);
-    // Surface unresolved decisions that still need another role.
-    const decisions = task?.blueprint?.humanDecisionsRequired || [];
-    if (decisions.length > 0) reason.push(`A human decision is still required: ${decisions[0]}`);
-    return { relevance: 'direct', matchedCapabilities: matched, unmatchedCapabilities: unmatched, reason };
+  // Can make the decision (and, if needed, implement): fully actionable.
+  if (canDecide && (canImplement || !family)) {
+    reason.push('You can make the decision this task needs and carry out the change.');
+    return { relevance: 'direct', matchedCapabilities: matchedSet, unmatchedCapabilities: unmatched, reason };
   }
 
-  if (matchedSecondary.length > 0) {
-    reason.push(`Your capabilities support this task in a secondary role (${secondaryRoles.join(', ')}).`);
-    reason.push(`The primary role (${primaryRoles.join(', ') || 'another role'}) is likely needed to complete it.`);
-    return { relevance: 'supporting', matchedCapabilities: matched, unmatchedCapabilities: unmatched, reason };
+  // Can make the decision but not implement: still a decision owner.
+  if (canDecide) {
+    reason.push('You can make the decision this task needs; implementation may require another capability.');
+    return { relevance: 'decision', matchedCapabilities: matchedSet, unmatchedCapabilities: unmatched, reason };
   }
 
-  if (matchedContributor.length > 0) {
-    reason.push(`Your capabilities let you contribute to or review this task (${contributorRoles.join(', ')}).`);
-    reason.push(`Another role owns the change (${primaryRoles.join(', ') || 'primary role'}).`);
-    return { relevance: 'review-only', matchedCapabilities: matched, unmatchedCapabilities: unmatched, reason };
+  // Can implement, but the task needs a decision you cannot make: relevant
+  // implementation work, blocked by that decision.
+  if (canImplement && decisionConcern && (hasUnresolvedDecision || true)) {
+    reason.push('You can implement this change once the required decision is made.');
+    reason.push(`Completion likely requires input from ${describeDecider(decisionConcern)} to make the ${decisionConcern} decision.`);
+    return { relevance: 'implementation-blocked', matchedCapabilities: matchedSet, unmatchedCapabilities: unmatched, reason };
   }
 
-  if (caps.includes(REVIEW_ONLY)) {
-    reason.push('You can review but not change the site; this task is shown for review.');
-    return { relevance: 'review-only', matchedCapabilities: [], unmatchedCapabilities: unmatched, reason };
+  // Can implement and no distinct decision is required: actionable.
+  if (canImplement) {
+    reason.push('You can carry out this change; no separate decision is required.');
+    return { relevance: 'direct', matchedCapabilities: matchedSet, unmatchedCapabilities: unmatched, reason };
   }
 
-  // No capability matches this task's roles: it belongs to someone else.
-  reason.push(`This task's roles (${[...primaryRoles, ...secondaryRoles].join(', ') || 'unknown'}) are outside your selected capabilities.`);
-  reason.push('Consider preparing a handoff to the suggested role.');
-  return { relevance: 'handoff', matchedCapabilities: [], unmatchedCapabilities: caps.filter(c => c !== REVIEW_ONLY), reason };
+  // Verification/review only.
+  if (canVerify) {
+    reason.push('You can verify or review this task; likely primary role involvement rests with another capability.');
+    if (primaryRoles.length) reason.push(`Likely primary role involvement: ${primaryRoles.join(', ')}.`);
+    return { relevance: 'review-only', matchedCapabilities: matchedSet, unmatchedCapabilities: unmatched, reason };
+  }
+
+  // Nothing matches: this task likely needs another role.
+  reason.push('Your selected capabilities do not cover this task.');
+  if (primaryRoles.length) reason.push(`Completion likely requires input from ${primaryRoles.join(', ')}.`);
+  reason.push('Prepare a handoff to the suggested role.');
+  return { relevance: 'handoff', matchedCapabilities: [], unmatchedCapabilities: caps.filter(c => c !== 'I can review but not change the site'), reason };
+}
+
+/** Human-readable description of who makes a given decision concern. */
+function describeDecider(concern) {
+  switch (concern) {
+    case 'content': return 'Content Authoring';
+    case 'contrast': return 'Visual Design';
+    case 'visual': return 'Visual Design';
+    case 'structure': return 'UX / Interaction Design';
+    case 'behavior': return 'UX / Interaction Design';
+    case 'product': return 'Business';
+    default: return 'another role';
+  }
 }
 
 /**
- * Back-compatible boolean: is a task relevant to a profile? "Relevant" means it
- * is not a pure handoff (direct, supporting, review-only, or unfiltered all
- * remain visible). Findings are NEVER removed — this only informs filtering.
+ * Back-compatible boolean: is a task relevant to a profile? Relevant = not a pure
+ * handoff. Findings are NEVER removed — this only informs filtering.
  */
 export function isTaskRelevantToProfile(task, userCapabilities = []) {
   const { relevance } = routeTaskForProfile(task, userCapabilities);
