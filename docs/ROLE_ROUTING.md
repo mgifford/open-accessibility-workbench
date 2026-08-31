@@ -4,14 +4,23 @@ Accessibility is multidisciplinary. Open Accessibility Workbench uses W3C ARRM (
 
 ---
 
-## 1. W3C ARRM Roles
+## 1. Roles
+
+### W3C ARRM roles (the five defined by ARRM)
+- **Business**: Product requirements, policy, and priorities that shape accessibility outcomes.
 - **Content Authoring**: Text, alt text, headings, captions, link meaning, page language.
 - **Visual Design**: Color contrast, typography size, layout hierarchy, focus indicator visuals.
-- **UX & Interaction Design**: Keyboard workflows, form error handling, screen reader interactions, landmark structure.
-- **Front-End Development**: Semantic HTML, ARIA attributes, keyboard traps, DOM order, responsive reflow.
-- **Back-End Development**: Server-rendered markup templates, CMS field formatters, dynamic API responses.
-- **Testing (QA)**: Manual screen reader verification, automated regression tests, keyboard navigation.
-- **Product Management & Governance**: Prioritization, vendor accessibility compliance, policy enforcement.
+- **User Experience (UX) Design**: Keyboard workflows, form error handling, focus order, landmark structure.
+- **Front-End Development**: Semantic HTML, ARIA attributes, keyboard handling, DOM order, responsive reflow.
+
+These come directly from the W3C ARRM matrix (`w3c/wai-arrm`, `draft`; snapshot
+in `public/data/arrm/`). ARRM is an **in-progress draft** — guidance, not dogma.
+
+### Workbench extension role (NOT part of ARRM)
+- **Testing / QA**: Manual/assistive-technology verification, automated
+  regression, keyboard navigation. Added for capability routing and tagged
+  `source: "open-accessibility-workbench-extension"` so it is never presented as
+  a W3C ARRM role.
 
 ---
 

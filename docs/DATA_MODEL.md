@@ -1,6 +1,16 @@
 # Canonical Data Model & Finding Hierarchy
 
-To preserve data provenance while correlating findings across multiple scanners, the Open Accessibility Workbench converts all inputs into a strict, lossless internal schema: the **Canonical Evidence Model**.
+To preserve data provenance while correlating findings across multiple scanners, the Open Accessibility Workbench converts all inputs into a strict internal schema: the **Canonical Evidence Model**.
+
+The model is **provenance-preserving**, not lossless: it retains each scanner's
+upstream identities (finding, pattern, occurrence, duplicate metadata), the
+originating scanner and record index, and the raw evidence (rendered HTML,
+locator, message, guidance). It does **not** currently store a hash of the source
+report, a stable JSON Pointer to the originating record, or a verbatim copy of
+the raw record — so a normalized observation cannot yet be byte-reconstructed
+from the model alone. Fields a scanner does not provide are simply absent; the
+normalizers do not invent values. (Adding a `source.recordPointer` and a source
+hash is tracked as a follow-up.)
 
 ---
 
