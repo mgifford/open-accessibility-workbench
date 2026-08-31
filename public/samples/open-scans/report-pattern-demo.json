@@ -1,0 +1,63 @@
+{
+  "_fixtureNote": "REALISTIC pattern-reduction demo derived from Open Scans issue #347. It includes the full 5-icon social-links cluster (linkedin/mastodon/youtube/bluesky/facebook) repeated across 3 pages, plus a recurring footer color-contrast pattern, to exercise the reduction: many observations -> few patterns -> a shared component. Real pattern ids from #347 are used where known (linkedin A11Y-0fa23e4b); the other social-icon ids are the real per-network ids observed in #347. See FIXTURE_MANIFEST.md.",
+  "issueNumber": 347,
+  "scanTitle": "Drupal Camp Asheville (pattern demo subset)",
+  "engines": ["axe"],
+  "scanContext": { "viewport": { "width": 1280, "height": 800 }, "browser": "firefox", "colorScheme": "both" },
+  "scannedAt": "2026-08-20T17:07:27.574Z",
+  "axeTotals": { "passed": 910, "failed": 34, "cantTell": 15, "inapplicable": 90 },
+  "results": [
+    {
+      "submittedUrl": "https://www.drupalasheville.com/",
+      "finalUrl": "https://www.drupalasheville.com/",
+      "pageTitle": "Home | Drupal Camp Asheville",
+      "scanContext": { "browser": "firefox" },
+      "axe": {
+        "executed": true,
+        "counts": { "passed": 453, "failed": 24, "cantTell": 7, "inapplicable": 48 },
+        "failedRules": ["link-name", "color-contrast"],
+        "failures": [
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--linkedin", "html": "<a class=\"social-media-link-icon--linkedin\" href=\"https://www.linkedin.com/company/drupal-asheville/\"><span class=\"fab fa-linkedin fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-0fa23e4b", "a11yPatternDisplayId": "A11Y-PAT-7947E7825C01", "fingerprint": "7c88e89b3c3d" },
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--mastodon", "html": "<a class=\"social-media-link-icon--mastodon\" href=\"https://mastodon.social/@drupalasheville\"><span class=\"fab fa-mastodon fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-3545c082", "a11yPatternDisplayId": "A11Y-PAT-3545C082AAAA", "fingerprint": "aa01aa01aa01" },
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--youtube_channel", "html": "<a class=\"social-media-link-icon--youtube_channel\" href=\"https://youtube.com/@drupalasheville\"><span class=\"fab fa-youtube fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-d02448a3", "a11yPatternDisplayId": "A11Y-PAT-D02448A3AAAA", "fingerprint": "bb02bb02bb02" },
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--bluesky", "html": "<a class=\"social-media-link-icon--bluesky\" href=\"https://bsky.app/profile/drupalasheville\"><span class=\"fab fa-bluesky fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-af4d7b69", "a11yPatternDisplayId": "A11Y-PAT-AF4D7B69AAAA", "fingerprint": "cc03cc03cc03" },
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--facebook", "html": "<a class=\"social-media-link-icon--facebook\" href=\"https://facebook.com/drupalasheville\"><span class=\"fab fa-facebook fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-12f24127", "a11yPatternDisplayId": "A11Y-PAT-12F24127AAAA", "fingerprint": "dd04dd04dd04" },
+          { "rule": "color-contrast", "impact": "serious", "wcagSc": ["wcag2aa","wcag143"], "xpath": ".footer-copy", "html": "<span class=\"footer-copy\">© 2026 Drupal Asheville</span>", "message": "Elements must meet minimum color contrast ratio thresholds", "patternId": "A11Y-ftr00001", "a11yPatternDisplayId": "A11Y-PAT-FTR000010001", "fingerprint": "ee05ee05ee05" }
+        ]
+      }
+    },
+    {
+      "submittedUrl": "https://www.drupalasheville.com/events/2026/schedule",
+      "finalUrl": "https://www.drupalasheville.com/events/2026/schedule",
+      "pageTitle": "Schedule | Drupal Asheville",
+      "scanContext": { "browser": "firefox" },
+      "axe": {
+        "executed": true,
+        "counts": { "passed": 457, "failed": 10, "cantTell": 8, "inapplicable": 42 },
+        "failedRules": ["link-name", "color-contrast"],
+        "failures": [
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--linkedin", "html": "<a class=\"social-media-link-icon--linkedin\" href=\"https://www.linkedin.com/company/drupal-asheville/\"><span class=\"fab fa-linkedin fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-0fa23e4b", "a11yPatternDisplayId": "A11Y-PAT-7947E7825C01", "fingerprint": "7c88e89b3c3d" },
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--mastodon", "html": "<a class=\"social-media-link-icon--mastodon\" href=\"https://mastodon.social/@drupalasheville\"><span class=\"fab fa-mastodon fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-3545c082", "a11yPatternDisplayId": "A11Y-PAT-3545C082AAAA", "fingerprint": "aa01aa01aa01" },
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--facebook", "html": "<a class=\"social-media-link-icon--facebook\" href=\"https://facebook.com/drupalasheville\"><span class=\"fab fa-facebook fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-12f24127", "a11yPatternDisplayId": "A11Y-PAT-12F24127AAAA", "fingerprint": "dd04dd04dd04" },
+          { "rule": "color-contrast", "impact": "serious", "wcagSc": ["wcag2aa","wcag143"], "xpath": ".footer-copy", "html": "<span class=\"footer-copy\">© 2026 Drupal Asheville</span>", "message": "Elements must meet minimum color contrast ratio thresholds", "patternId": "A11Y-ftr00001", "a11yPatternDisplayId": "A11Y-PAT-FTR000010001", "fingerprint": "ee05ee05ee05" }
+        ]
+      }
+    },
+    {
+      "submittedUrl": "https://www.drupalasheville.com/sponsors",
+      "finalUrl": "https://www.drupalasheville.com/sponsors",
+      "pageTitle": "Sponsors | Drupal Asheville",
+      "scanContext": { "browser": "firefox" },
+      "axe": {
+        "executed": true,
+        "counts": { "passed": 400, "failed": 8, "cantTell": 5, "inapplicable": 40 },
+        "failedRules": ["link-name", "color-contrast"],
+        "failures": [
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--linkedin", "html": "<a class=\"social-media-link-icon--linkedin\" href=\"https://www.linkedin.com/company/drupal-asheville/\"><span class=\"fab fa-linkedin fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-0fa23e4b", "a11yPatternDisplayId": "A11Y-PAT-7947E7825C01", "fingerprint": "7c88e89b3c3d" },
+          { "rule": "link-name", "impact": "serious", "wcagSc": ["wcag2a","wcag244","wcag412"], "xpath": ".social-media-link-icon--youtube_channel", "html": "<a class=\"social-media-link-icon--youtube_channel\" href=\"https://youtube.com/@drupalasheville\"><span class=\"fab fa-youtube fa-2x\"></span></a>", "message": "Links must have discernible text", "patternId": "A11Y-d02448a3", "a11yPatternDisplayId": "A11Y-PAT-D02448A3AAAA", "fingerprint": "bb02bb02bb02" },
+          { "rule": "color-contrast", "impact": "serious", "wcagSc": ["wcag2aa","wcag143"], "xpath": ".footer-copy", "html": "<span class=\"footer-copy\">© 2026 Drupal Asheville</span>", "message": "Elements must meet minimum color contrast ratio thresholds", "patternId": "A11Y-ftr00001", "a11yPatternDisplayId": "A11Y-PAT-FTR000010001", "fingerprint": "ee05ee05ee05" }
+        ]
+      }
+    }
+  ]
+}

@@ -42,6 +42,7 @@ export function clusterPatternOccurrences(observations, totalPagesInScan = 1) {
       ruleId: group.ruleId,
       sourceRuleId: group.sourceRuleId,
       upstreamPatternId: group.upstreamPatternId,
+      familySignature: group.observations[0]?.signatures?.familySignature || null,
       representativeHtml: group.representativeHtml,
       representativeLocator: group.representativeLocator,
       pagesCount,

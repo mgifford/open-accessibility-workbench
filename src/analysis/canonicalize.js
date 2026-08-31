@@ -21,6 +21,7 @@ export function enrichObservationsWithSignatures(observations) {
         selectorSignature,
         exactHtmlSignature: domSigs.exactHtmlSignature,
         structureSignature: domSigs.structureSignature,
+        familySignature: domSigs.familySignature,
         semanticSignature: domSigs.semanticSignature
       }
     };

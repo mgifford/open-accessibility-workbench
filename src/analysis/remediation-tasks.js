@@ -17,7 +17,10 @@ export function buildRemediationTasks(clusters = [], hypotheses = [], totalPages
 
   for (let i = 0; i < clusters.length; i++) {
     const cluster = clusters[i];
-    const hypothesis = hypotheses.find(h => h.clusterId === cluster.id) || null;
+    // A component hypothesis may span several clusters; match on any member.
+    const hypothesis = hypotheses.find(
+      h => h.clusterId === cluster.id || (Array.isArray(h.clusterIds) && h.clusterIds.includes(cluster.id))
+    ) || null;
     const { urgency, leverage } = calculateTaskPriority(cluster, hypothesis, totalPages);
     const roles = getRolesForWcag(cluster.wcag, cluster.ruleId);
     const technologyContext = getTechnologyContext(cluster.observations, userConfirmedTech, scanMetadata);

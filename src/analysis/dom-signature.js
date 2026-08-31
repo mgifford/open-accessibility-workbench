@@ -41,9 +41,22 @@ export function extractDomSignatures(htmlSnippet, locator = '') {
 
   const semanticSignature = `${tag}${role ? `[role=${role}]` : ''}${hasAriaLabel ? '[aria-label]' : ''}${hasAlt ? '[alt]' : ''}${hasAriaHidden ? '[aria-hidden]' : ''}`;
 
+  // 4. Family Signature: the structure signature with volatile *per-instance*
+  // suffixes of BEM-style / icon-font class names abstracted away, so members of
+  // one reusable component (e.g. every `social-media-link-icon--<network>` and
+  // its `fa-<network>` icon) collapse to a single family key. This is what turns
+  // "5 social icons across N pages" into one shared-component candidate. The
+  // abstraction is conservative — it only collapses the trailing modifier of a
+  // `base--modifier` class and the trailing token of an icon-font `fa-<x>`
+  // class, both of which vary per instance without changing the a11y defect.
+  const familySignature = structureSignature
+    .replace(/([a-z0-9]+(?:-[a-z0-9]+)*)--[a-z0-9_]+/gi, '$1--*')
+    .replace(/\bfa-[a-z0-9_]+/gi, 'fa-*');
+
   return {
     exactHtmlSignature,
     structureSignature,
+    familySignature,
     semanticSignature
   };
 }

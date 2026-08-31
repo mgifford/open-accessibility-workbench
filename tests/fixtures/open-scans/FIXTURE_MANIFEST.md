@@ -97,3 +97,15 @@ cross-scanner overlap (`overlapEntries`, empty here).
 Page-level summary CSV for issue #347 (per-page engine failure counts). Used to
 verify the CSV fallback adapter; it is intentionally NOT a source of
 finding-level selectors/HTML.
+
+## report-pattern-demo.json
+
+A **realistic pattern-reduction demo** derived from issue #347, built to exercise
+the Phase 5 reduction (observations → patterns → shared components). It includes
+the full 5-icon social-links cluster (linkedin/mastodon/youtube/bluesky/facebook,
+each with its real per-network `patternId` from #347) repeated across 3 pages,
+plus a recurring footer `color-contrast` pattern. It is **synthetic in its page
+composition** (the three-page repetition and the footer example are assembled to
+demonstrate reduction), while the social-icon markup and pattern ids are from the
+real report. Not a preserved artifact; used only to prove the engine reduces and
+does not over-merge. Also shipped as a sample (`public/samples/`).
