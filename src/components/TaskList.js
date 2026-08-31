@@ -2,23 +2,27 @@ import { workspaceStore } from '../state/workspace.js';
 import { profileStore } from '../state/profile.js';
 import { isTaskRelevantToProfile } from '../roles/route-task.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
+import { taskStatusStore, TASK_STATUSES, TASK_STATUS_LABELS } from '../state/task-status.js';
 
 export class TaskList extends HTMLElement {
   constructor() {
     super();
     this.filterRole = 'all';
     this.filterUrgency = 'all';
+    this.filterStatus = 'all';
   }
 
   connectedCallback() {
     this.unsubscribeWorkspace = workspaceStore.subscribe(() => this.render());
     this.unsubscribeProfile = profileStore.subscribe(() => this.render());
+    this.unsubscribeStatus = taskStatusStore.subscribe(() => this.render());
     this.render();
   }
 
   disconnectedCallback() {
     if (this.unsubscribeWorkspace) this.unsubscribeWorkspace();
     if (this.unsubscribeProfile) this.unsubscribeProfile();
+    if (this.unsubscribeStatus) this.unsubscribeStatus();
   }
 
   render() {
@@ -43,13 +47,20 @@ export class TaskList extends HTMLElement {
       filtered = filtered.filter(t => t.urgency === this.filterUrgency);
     }
 
+    if (this.filterStatus !== 'all') {
+      filtered = filtered.filter(t => taskStatusStore.get(t.id) === this.filterStatus);
+    }
+
+    const statusCounts = taskStatusStore.summary(tasks.map(t => t.id));
+
     this.innerHTML = `
       <section>
         <div class="card-header">
           <div>
             <h2 class="card-title" style="font-size: var(--font-size-2xl);">Remediation Tasks</h2>
             <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-              ${filtered.length} actionable tasks (from ${tasks.length} total)
+              ${filtered.length} actionable tasks (from ${tasks.length} total) &bull;
+              ${statusCounts.done} done, ${statusCounts['in-progress']} in progress, ${statusCounts['needs-decision']} need a decision, ${statusCounts.open} open
             </p>
           </div>
         </div>
@@ -76,6 +87,14 @@ export class TaskList extends HTMLElement {
               <option value="medium" ${this.filterUrgency === 'medium' ? 'selected' : ''}>Medium</option>
             </select>
           </div>
+
+          <div>
+            <label for="filter-status" style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary); display: block; margin-bottom: var(--space-1);">Status:</label>
+            <select id="filter-status" style="padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+              <option value="all" ${this.filterStatus === 'all' ? 'selected' : ''}>All Statuses</option>
+              ${TASK_STATUSES.map(s => `<option value="${s}" ${this.filterStatus === s ? 'selected' : ''}>${TASK_STATUS_LABELS[s]}</option>`).join('')}
+            </select>
+          </div>
         </div>
 
         <!-- Task List -->
@@ -89,7 +108,8 @@ export class TaskList extends HTMLElement {
                     Rule: <code>${escapeHtml(t.ruleId)}</code> (WCAG ${escapeHtml(t.wcag.join(', ')) || 'N/A'})
                   </div>
                 </div>
-                <div style="display: flex; gap: var(--space-2);">
+                <div style="display: flex; gap: var(--space-2); align-items: center;">
+                  ${t.consolidated ? `<span class="badge badge-medium">Consolidated: ${t.metrics.patternVariantCount} patterns</span>` : ''}
                   <span class="badge badge-${escapeAttr(t.urgency)}">Urgency: ${escapeHtml(t.urgency)}</span>
                   <span class="badge badge-high">Leverage: ${escapeHtml(t.leverage)}</span>
                 </div>
@@ -104,8 +124,14 @@ export class TaskList extends HTMLElement {
                   <strong>Primary Role:</strong> ${escapeHtml(t.roles.primary)}
                   ${t.componentHypothesis ? ` | <strong>Component:</strong> ${escapeHtml(t.componentHypothesis.name)}` : ''}
                 </div>
-                <div>
-                  <strong>Affected:</strong> ${t.metrics.affectedPagesCount} pages (${t.metrics.observationCount} occurrences)
+                <div style="display: flex; align-items: center; gap: var(--space-3);">
+                  <span><strong>Affected:</strong> ${t.metrics.affectedPagesCount} pages (${t.metrics.observationCount} occurrences)</span>
+                  <label style="display: flex; align-items: center; gap: var(--space-1);">
+                    <span style="font-weight: 700;">Status</span>
+                    <select class="task-status-select" data-task-id="${escapeAttr(t.id)}" style="padding: var(--space-1); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+                      ${TASK_STATUSES.map(s => `<option value="${s}" ${taskStatusStore.get(t.id) === s ? 'selected' : ''}>${TASK_STATUS_LABELS[s]}</option>`).join('')}
+                    </select>
+                  </label>
                 </div>
               </div>
             </article>
@@ -134,6 +160,21 @@ export class TaskList extends HTMLElement {
         this.render();
       });
     }
+
+    const statusSelect = this.querySelector('#filter-status');
+    if (statusSelect) {
+      statusSelect.addEventListener('change', (e) => {
+        this.filterStatus = e.target.value;
+        this.render();
+      });
+    }
+
+    // Per-task status changes. The store notifies subscribers, which re-renders.
+    this.querySelectorAll('.task-status-select').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        taskStatusStore.set(e.target.getAttribute('data-task-id'), e.target.value);
+      });
+    });
   }
 }
 
