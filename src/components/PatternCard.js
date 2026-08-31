@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils/escape-html.js';
+
 export class PatternCard extends HTMLElement {
   set pattern(cluster) {
     this._cluster = cluster;
@@ -15,9 +17,9 @@ export class PatternCard extends HTMLElement {
       <div class="card" style="border-left: 4px solid var(--color-brand-primary);">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
-            <h4 style="font-weight: 700; font-size: var(--font-size-base);">${c.ruleId}</h4>
+            <h4 style="font-weight: 700; font-size: var(--font-size-base);">${escapeHtml(c.ruleId)}</h4>
             <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-              ${c.upstreamPatternId ? `ID: ${c.upstreamPatternId}` : 'Synthesized DOM cluster'}
+              ${c.upstreamPatternId ? `ID: ${escapeHtml(c.upstreamPatternId)}` : 'Synthesized DOM cluster'}
             </div>
           </div>
           <div style="display: flex; gap: var(--space-2);">

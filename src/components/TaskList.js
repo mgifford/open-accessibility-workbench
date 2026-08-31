@@ -1,6 +1,7 @@
 import { workspaceStore } from '../state/workspace.js';
 import { profileStore } from '../state/profile.js';
 import { isTaskRelevantToProfile } from '../roles/route-task.js';
+import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 
 export class TaskList extends HTMLElement {
   constructor() {
@@ -83,25 +84,25 @@ export class TaskList extends HTMLElement {
             <article class="card" style="margin-bottom: 0;">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2);">
                 <div>
-                  <a href="#/task/${t.id}" style="font-size: var(--font-size-lg); font-weight: 700; color: var(--color-brand-primary); text-decoration: none;">${t.title}</a>
+                  <a href="#/task/${escapeAttr(t.id)}" style="font-size: var(--font-size-lg); font-weight: 700; color: var(--color-brand-primary); text-decoration: none;">${escapeHtml(t.title)}</a>
                   <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
-                    Rule: <code>${t.ruleId}</code> (WCAG ${t.wcag.join(', ') || 'N/A'})
+                    Rule: <code>${escapeHtml(t.ruleId)}</code> (WCAG ${escapeHtml(t.wcag.join(', ')) || 'N/A'})
                   </div>
                 </div>
                 <div style="display: flex; gap: var(--space-2);">
-                  <span class="badge badge-${t.urgency}">Urgency: ${t.urgency}</span>
-                  <span class="badge badge-high">Leverage: ${t.leverage}</span>
+                  <span class="badge badge-${escapeAttr(t.urgency)}">Urgency: ${escapeHtml(t.urgency)}</span>
+                  <span class="badge badge-high">Leverage: ${escapeHtml(t.leverage)}</span>
                 </div>
               </div>
 
               <div style="margin: var(--space-3) 0; font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-                ${t.blueprint.problem}
+                ${escapeHtml(t.blueprint.problem)}
               </div>
 
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-muted);">
                 <div>
-                  <strong>Primary Role:</strong> ${t.roles.primary}
-                  ${t.componentHypothesis ? ` | <strong>Component:</strong> ${t.componentHypothesis.name}` : ''}
+                  <strong>Primary Role:</strong> ${escapeHtml(t.roles.primary)}
+                  ${t.componentHypothesis ? ` | <strong>Component:</strong> ${escapeHtml(t.componentHypothesis.name)}` : ''}
                 </div>
                 <div>
                   <strong>Affected:</strong> ${t.metrics.affectedPagesCount} pages (${t.metrics.observationCount} occurrences)

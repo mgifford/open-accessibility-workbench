@@ -1,4 +1,5 @@
 import { workspaceStore } from '../state/workspace.js';
+import { escapeHtml, escapeAttr, safeUrl } from '../utils/escape-html.js';
 
 export class PatternExplorer extends HTMLElement {
   connectedCallback() {
@@ -36,9 +37,9 @@ export class PatternExplorer extends HTMLElement {
               <article class="card" style="border-left: 4px solid var(--color-brand-primary);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2);">
                   <div>
-                    <h3 style="font-size: var(--font-size-lg); font-weight: 700;">Pattern: ${c.ruleId}</h3>
+                    <h3 style="font-size: var(--font-size-lg); font-weight: 700;">Pattern: ${escapeHtml(c.ruleId)}</h3>
                     <div style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: var(--space-1);">
-                      ${c.upstreamPatternId ? `Authoritative Upstream ID: <code>${c.upstreamPatternId}</code>` : 'Synthesized DOM cluster'}
+                      ${c.upstreamPatternId ? `Authoritative Upstream ID: <code>${escapeHtml(c.upstreamPatternId)}</code>` : 'Synthesized DOM cluster'}
                     </div>
                   </div>
                   <div style="display: flex; gap: var(--space-2);">
@@ -51,7 +52,7 @@ export class PatternExplorer extends HTMLElement {
                 <div style="background-color: var(--color-bg-subtle); padding: var(--space-3); border-radius: var(--radius-md); margin: var(--space-4) 0;">
                   <strong style="font-size: var(--font-size-xs); text-transform: uppercase; color: var(--color-text-secondary);">Why these findings are grouped:</strong>
                   <ul style="margin-left: var(--space-4); margin-top: var(--space-1); font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-                    ${c.groupingRationale.map(r => `<li>${r}</li>`).join('')}
+                    ${c.groupingRationale.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
                   </ul>
                 </div>
 
@@ -59,8 +60,8 @@ export class PatternExplorer extends HTMLElement {
                 ${hyp ? `
                   <div style="margin-bottom: var(--space-4);">
                     <span style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-brand-primary);">COMPONENT HYPOTHESIS:</span>
-                    <strong>${hyp.name}</strong> (${hyp.confidence} confidence)
-                    <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">${hyp.rationale}</p>
+                    <strong>${escapeHtml(hyp.name)}</strong> (${escapeHtml(hyp.confidence)} confidence)
+                    <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">${escapeHtml(hyp.rationale)}</p>
                   </div>
                 ` : ''}
 
@@ -75,7 +76,7 @@ export class PatternExplorer extends HTMLElement {
 
                     <p style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary);">Affected Page URLs:</p>
                     <ul style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-left: var(--space-4); margin-top: var(--space-1);">
-                      ${c.affectedPages.map(url => `<li><a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></li>`).join('')}
+                      ${c.affectedPages.map(url => `<li><a href="${escapeAttr(safeUrl(url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a></li>`).join('')}
                     </ul>
                   </div>
                 </details>
@@ -88,9 +89,5 @@ export class PatternExplorer extends HTMLElement {
   }
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 customElements.define('pattern-explorer', PatternExplorer);

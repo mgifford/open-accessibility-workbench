@@ -2,6 +2,7 @@ import { workspaceStore } from '../state/workspace.js';
 import { formatGitHubIssue } from '../export/github-issue.js';
 import { runValidationSuite } from '../validation/registry.js';
 import { requestAiRemediation } from '../ai/client.js';
+import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 
 export class TaskDetail extends HTMLElement {
   constructor() {
@@ -59,15 +60,15 @@ export class TaskDetail extends HTMLElement {
         <div class="card" style="border-top: 4px solid var(--color-brand-primary);">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2);">
             <div>
-              <span style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-muted);">TASK ID: ${task.id}</span>
-              <h2 style="font-size: var(--font-size-2xl); font-weight: 800; margin-top: var(--space-1);">${task.title}</h2>
+              <span style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-muted);">TASK ID: ${escapeHtml(task.id)}</span>
+              <h2 style="font-size: var(--font-size-2xl); font-weight: 800; margin-top: var(--space-1);">${escapeHtml(task.title)}</h2>
               <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-1);">
-                Rule: <code>${task.ruleId}</code> (WCAG: ${task.wcag.join(', ') || 'N/A'})
+                Rule: <code>${escapeHtml(task.ruleId)}</code> (WCAG: ${escapeHtml(task.wcag.join(', ')) || 'N/A'})
               </div>
             </div>
             <div style="display: flex; gap: var(--space-2);">
-              <span class="badge badge-${task.urgency}">Urgency: ${task.urgency}</span>
-              <span class="badge badge-high">Leverage: ${task.leverage}</span>
+              <span class="badge badge-${escapeAttr(task.urgency)}">Urgency: ${escapeHtml(task.urgency)}</span>
+              <span class="badge badge-high">Leverage: ${escapeHtml(task.leverage)}</span>
             </div>
           </div>
 
@@ -76,9 +77,9 @@ export class TaskDetail extends HTMLElement {
             <h3 style="font-size: var(--font-size-base); font-weight: 700; color: var(--color-text-primary); margin-bottom: var(--space-2);">
               Problem & Systemic Impact
             </h3>
-            <p style="color: var(--color-text-secondary); margin-bottom: var(--space-2);">${task.blueprint.problem}</p>
+            <p style="color: var(--color-text-secondary); margin-bottom: var(--space-2);">${escapeHtml(task.blueprint.problem)}</p>
             <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm); background-color: var(--color-bg-subtle); padding: var(--space-3); border-radius: var(--radius-md);">
-              ${task.blueprint.systemicRationale}
+              ${escapeHtml(task.blueprint.systemicRationale)}
             </p>
           </div>
 
@@ -86,18 +87,18 @@ export class TaskDetail extends HTMLElement {
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6);">
             <div style="background-color: var(--color-bg-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
               <strong style="font-size: var(--font-size-xs); text-transform: uppercase; color: var(--color-text-secondary);">Component / Template Hypothesis</strong>
-              <div style="font-size: var(--font-size-base); font-weight: 700; margin-top: var(--space-1);">${task.componentHypothesis?.name || 'Shared Component'}</div>
-              <p style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-1);">${task.componentHypothesis?.rationale || ''}</p>
+              <div style="font-size: var(--font-size-base); font-weight: 700; margin-top: var(--space-1);">${escapeHtml(task.componentHypothesis?.name) || 'Shared Component'}</div>
+              <p style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-1);">${escapeHtml(task.componentHypothesis?.rationale)}</p>
             </div>
 
             <div style="background-color: var(--color-bg-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
               <strong style="font-size: var(--font-size-xs); text-transform: uppercase; color: var(--color-text-secondary);">Role Guidance (ARRM)</strong>
-              <div style="font-size: var(--font-size-base); font-weight: 700; margin-top: var(--space-1);">${task.roles.primary}</div>
+              <div style="font-size: var(--font-size-base); font-weight: 700; margin-top: var(--space-1);">${escapeHtml(task.roles.primary)}</div>
               <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-1);">
-                Supporting: ${task.roles.secondary.join(', ') || 'None'}
+                Supporting: ${escapeHtml(task.roles.secondary.join(', ')) || 'None'}
               </div>
               <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
-                Source: ${task.roles.source}
+                Source: ${escapeHtml(task.roles.source)}
               </div>
             </div>
           </div>
@@ -109,7 +110,7 @@ export class TaskDetail extends HTMLElement {
                 Human Decision Required Before Implementation
               </h3>
               <ul style="margin-left: var(--space-4); color: var(--color-text-primary); font-size: var(--font-size-sm);">
-                ${task.blueprint.humanDecisionsRequired.map(d => `<li>${d}</li>`).join('')}
+                ${task.blueprint.humanDecisionsRequired.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
               </ul>
             </div>
           ` : ''}
@@ -127,7 +128,7 @@ export class TaskDetail extends HTMLElement {
           ${task.blueprint.targetMarkup ? `
             <div style="margin-bottom: var(--space-6);">
               <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Deterministic Remediation Guidance</h3>
-              <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">${task.blueprint.whatNeedsToChange}</p>
+              <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">${escapeHtml(task.blueprint.whatNeedsToChange)}</p>
               <pre class="code-block" style="margin-bottom: var(--space-3);"><code>${escapeHtml(task.blueprint.targetMarkup)}</code></pre>
 
               <!-- Validation status -->
@@ -144,7 +145,7 @@ export class TaskDetail extends HTMLElement {
           <div style="margin-bottom: var(--space-6);">
             <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Verification Steps</h3>
             <ol style="margin-left: var(--space-4); font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-              ${task.blueprint.verificationSteps.map(s => `<li style="margin-bottom: var(--space-1);">${s}</li>`).join('')}
+              ${task.blueprint.verificationSteps.map(s => `<li style="margin-bottom: var(--space-1);">${escapeHtml(s)}</li>`).join('')}
             </ol>
           </div>
 
@@ -207,25 +208,20 @@ export class TaskDetail extends HTMLElement {
             <div class="card" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-primary);">
               <h4 style="font-weight: 700; color: var(--color-brand-primary); margin-bottom: var(--space-2);">Local AI Remediation Candidate</h4>
               <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">
-                <strong>Strategy:</strong> ${result.recommendedStrategy}
+                <strong>Strategy:</strong> ${escapeHtml(result.recommendedStrategy)}
               </p>
               <pre class="code-block" style="margin-bottom: var(--space-3);"><code>${escapeHtml(result.targetMarkup || result.sourceAwareCandidate || '')}</code></pre>
               <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary);">
-                <strong>Validation Status:</strong> ${result.validationResult?.status || 'Passed'} (Completed in ${result.attempts} attempts)
+                <strong>Validation Status:</strong> ${escapeHtml(result.validationResult?.status || 'Passed')} (Completed in ${escapeHtml(result.attempts)} attempts)
               </div>
             </div>
           `;
         } catch (err) {
-          aiPanel.innerHTML = `<div class="card" style="color: var(--color-urgency-critical);">AI Advisor Error: ${err.message}</div>`;
+          aiPanel.innerHTML = `<div class="card" style="color: var(--color-urgency-critical);">AI Advisor Error: ${escapeHtml(err.message)}</div>`;
         }
       });
     }
   }
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 customElements.define('task-detail', TaskDetail);

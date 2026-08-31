@@ -1,6 +1,7 @@
 import { workspaceStore } from '../state/workspace.js';
 import { profileStore } from '../state/profile.js';
 import { isTaskRelevantToProfile } from '../roles/route-task.js';
+import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 
 export class ReportOverview extends HTMLElement {
   connectedCallback() {
@@ -56,7 +57,7 @@ export class ReportOverview extends HTMLElement {
           These should agree with the original report.
         </p>
         <dl style="display: flex; gap: var(--space-6); flex-wrap: wrap; margin-bottom: var(--space-4);">
-          ${engines.length ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Engines</dt><dd style="font-weight: 600;">${engines.join(', ')}</dd></div>` : ''}
+          ${engines.length ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Engines</dt><dd style="font-weight: 600;">${escapeHtml(engines.join(', '))}</dd></div>` : ''}
           ${totalPages ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Pages scanned</dt><dd style="font-weight: 600;">${totalPages}</dd></div>` : ''}
           ${overlapData?.duplicateFindingTotals != null ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Duplicate findings</dt><dd style="font-weight: 600;">${overlapData.duplicateFindingTotals}</dd></div>` : ''}
         </dl>
@@ -74,7 +75,7 @@ export class ReportOverview extends HTMLElement {
             <tbody>
               ${rows.map(r => `
                 <tr style="border-bottom: 1px solid var(--color-border);">
-                  <th scope="row" style="padding: var(--space-2); font-weight: 600;">${r.label}</th>
+                  <th scope="row" style="padding: var(--space-2); font-weight: 600;">${escapeHtml(r.label)}</th>
                   <td style="padding: var(--space-2); text-align: right;">${r.failed}</td>
                   ${hasOverlapCols ? `<td style="padding: var(--space-2); text-align: right;">${r.unique ?? '—'}</td><td style="padding: var(--space-2); text-align: right;">${r.duplicates ?? '—'}</td>` : ''}
                 </tr>
@@ -113,7 +114,7 @@ export class ReportOverview extends HTMLElement {
           <div>
             <h2 class="card-title" style="font-size: var(--font-size-2xl);">Remediation Overview</h2>
             <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-              Source: <strong>${sourceSummary?.system || 'Unknown'}</strong> (Scan: ${sourceSummary?.scanId || 'N/A'})
+              Source: <strong>${escapeHtml(sourceSummary?.system) || 'Unknown'}</strong> (Scan: ${escapeHtml(sourceSummary?.scanId) || 'N/A'})
             </p>
           </div>
           <a href="#/tasks" class="btn btn-primary">View All Tasks (${tasks.length})</a>
@@ -163,7 +164,7 @@ export class ReportOverview extends HTMLElement {
               ${highestLeverageTasks.map(t => `
                 <li style="border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2);">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2);">
-                    <a href="#/task/${t.id}" style="font-weight: 600; color: var(--color-brand-primary); text-decoration: none;">${t.title}</a>
+                    <a href="#/task/${escapeAttr(t.id)}" style="font-weight: 600; color: var(--color-brand-primary); text-decoration: none;">${escapeHtml(t.title)}</a>
                     <span class="badge badge-high">${t.leverage}</span>
                   </div>
                   <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-1);">
@@ -184,11 +185,11 @@ export class ReportOverview extends HTMLElement {
               ${highestUrgencyTasks.map(t => `
                 <li style="border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2);">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2);">
-                    <a href="#/task/${t.id}" style="font-weight: 600; color: var(--color-brand-primary); text-decoration: none;">${t.title}</a>
+                    <a href="#/task/${escapeAttr(t.id)}" style="font-weight: 600; color: var(--color-brand-primary); text-decoration: none;">${escapeHtml(t.title)}</a>
                     <span class="badge badge-${t.urgency}">${t.urgency}</span>
                   </div>
                   <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-1);">
-                    Primary role: ${t.roles.primary}
+                    Primary role: ${escapeHtml(t.roles.primary)}
                   </div>
                 </li>
               `).join('')}
