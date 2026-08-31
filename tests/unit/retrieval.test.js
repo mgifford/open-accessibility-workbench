@@ -76,6 +76,35 @@ describe('Phase 10 gate: local retrieval with provenance and reasons', () => {
     assert.ok(!results.some(r => r.matchType === 'semantic'));
   });
 
+  test('missing chunk / empty or malformed corpus still yields deterministic guidance (no crash)', () => {
+    const empty = retrieveGuidance({ ruleId: 'link-name', corpus: [] });
+    assert.ok(empty.results.some(r => r.matchType === 'deterministic'));
+    const malformed = retrieveGuidance({ ruleId: 'link-name', corpus: [{ id: 'X' }] });
+    assert.ok(malformed.results.some(r => r.matchType === 'deterministic'));
+  });
+
+  test('offline lookup: retrieval and lexical search touch no network', () => {
+    // The corpus is a bundled JS module; retrieval is pure and synchronous.
+    // If any code path fetched over the network it would need async/fetch here.
+    const orig = globalThis.fetch;
+    let fetched = false;
+    globalThis.fetch = () => { fetched = true; throw new Error('no network allowed'); };
+    try {
+      const { results } = retrieveGuidance({ ruleId: 'link-name', query: 'contrast' });
+      assert.ok(results.length > 0);
+      assert.equal(fetched, false, 'retrieval must not use the network');
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  test('semantic tier stays absent even when a vector runtime is unavailable', () => {
+    // No vector runtime is imported at all; retrieval never yields a semantic
+    // result and never throws for its absence.
+    const { results } = retrieveGuidance({ ruleId: 'link-name', query: 'accessible name' });
+    assert.ok(!results.some(r => r.matchType === 'semantic'));
+  });
+
   test('exports identify retrieved guidance with provenance', async () => {
     const { generateRemediationBlueprint } = await import('../../src/guidance/remediation.js');
     const { exportTasksToJson } = await import('../../src/export/json.js');
