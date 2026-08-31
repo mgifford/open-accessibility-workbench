@@ -31,7 +31,7 @@ export function remediationFamily(ruleId = '') {
   return `rule-${r}`; // rule-specific family fallback
 }
 
-export function buildRemediationTasks(clusters = [], hypotheses = [], totalPages = 1, userConfirmedTech = null, scanMetadata = null, workspaceId = null) {
+export function buildRemediationTasks(clusters = [], hypotheses = [], totalPages = 1, userConfirmedTech = null, scanMetadata = null, workspaceId = null, rejectedTech = []) {
   // Consolidate by (component, remediation-family). Clusters of a component that
   // require the SAME implementation action merge into one task; clusters of the
   // same component requiring a DIFFERENT action become separate tasks. Clusters
@@ -63,7 +63,7 @@ export function buildRemediationTasks(clusters = [], hypotheses = [], totalPages
   for (const g of groups) g.clusters.sort(clusterSortKey);
   groups.sort((a, b) => a.key.localeCompare(b.key));
 
-  const tasks = groups.map(group => buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, workspaceId));
+  const tasks = groups.map(group => buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, workspaceId, rejectedTech));
 
   // Sort by Leverage then Urgency for presentation; ties broken by stable id so
   // the displayed order is also deterministic.
@@ -90,7 +90,7 @@ function clusterSortKey(a, b) {
  * or a standalone cluster). Aggregates observations, pages, occurrences, WCAG,
  * and rule set across members so nothing is lost.
  */
-function buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, workspaceId) {
+function buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, workspaceId, rejectedTech = []) {
   const { clusters, hypothesis, family } = group;
   const primary = clusters[0]; // stable: clusters were sorted by identity
 
@@ -124,12 +124,13 @@ function buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, 
   };
   const { urgency, leverage } = calculateTaskPriority(aggregate, hypothesis, totalPages);
   const roles = getRolesForWcag(wcag, primary.ruleId);
-  const technologyContext = getTechnologyContext(observations, userConfirmedTech, scanMetadata);
+  const technologyContext = getTechnologyContext(observations, userConfirmedTech, scanMetadata, rejectedTech);
   const blueprint = generateRemediationBlueprint({
     ruleId: primary.ruleId,
     cluster: aggregate,
     componentHypothesis: hypothesis,
     technologyContext,
+    remediationFamily: family,
     wcag
   });
 

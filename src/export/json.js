@@ -34,12 +34,19 @@ export function exportTasksToJson(workspaceData, options = {}) {
       id: t.id,
       title: t.title,
       ruleId: t.ruleId,
+      ruleIds: t.ruleIds || [t.ruleId],
+      remediationFamily: t.remediationFamily || null,
+      consolidated: Boolean(t.consolidated),
+      patternClusterIds: t.patternClusterIds || [],
+      upstreamPatternId: t.upstreamPatternId || null,
       wcag: t.wcag,
       urgency: t.urgency,
       leverage: t.leverage,
       metrics: t.metrics,
       componentHypothesis: t.componentHypothesis,
       roles: t.roles,
+      // Technology context with provenance: source, confidence, evidence, and
+      // whether the user confirmed it.
       technologyContext: t.technologyContext,
       blueprint: t.blueprint,
       affectedPages: t.affectedPages

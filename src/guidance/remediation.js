@@ -2,12 +2,15 @@
  * Generates rich, deterministic Remediation Blueprints without requiring any AI.
  */
 
+import { getTechnologyGuidance } from './technology-guidance.js';
+
 export function generateRemediationBlueprint(taskMeta) {
   const {
     ruleId,
     cluster,
     componentHypothesis,
     technologyContext,
+    remediationFamily = null,
     wcag = []
   } = taskMeta;
 
@@ -82,14 +85,34 @@ export function generateRemediationBlueprint(taskMeta) {
     ];
   }
 
+  // Technology-specific guidance EXTENDS the framework-neutral objective above;
+  // it never replaces `whatNeedsToChange` / `targetMarkup`, which remain the
+  // generic HTML remediation in every case. It is only populated for a
+  // defensibly-known technology (see technology-guidance.js).
+  const technologyGuidance = getTechnologyGuidance(
+    remediationFamily || familyFromRule(ruleId),
+    technologyContext
+  );
+
   return {
     problem,
     systemicRationale: whySystemic,
     likelyRootCause,
-    whatNeedsToChange,
+    whatNeedsToChange,         // always framework-neutral
     humanDecisionsRequired,
-    targetMarkup,
+    targetMarkup,              // always framework-neutral (never a source patch)
+    technologyGuidance,        // optional, additive framework context or null
     verificationSteps,
     nativeSemanticsFirst: true
   };
+}
+
+/** Local rule->family fallback so the blueprint can resolve tech guidance. */
+function familyFromRule(ruleId = '') {
+  const r = ruleId.toLowerCase();
+  if (/link-name|button-name|accessible-name/.test(r)) return 'accessible-name';
+  if (/color-contrast/.test(r)) return 'contrast';
+  if (/image-alt|alt/.test(r)) return 'text-alternative';
+  if (/region|landmark|heading/.test(r)) return 'structure';
+  return `rule-${r}`;
 }

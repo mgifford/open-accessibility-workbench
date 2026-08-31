@@ -10,6 +10,7 @@ import { clusterPatternOccurrences } from '../analysis/pattern-cluster.js';
 import { buildComponentHypotheses } from '../analysis/component-hypothesis.js';
 import { buildRemediationTasks } from '../analysis/remediation-tasks.js';
 import { makeSourceReport } from '../analysis/source-registry.js';
+import { technologyStore } from '../state/technology.js';
 import { workspaceStore } from '../state/workspace.js';
 
 export class ReportLoader extends HTMLElement {
@@ -251,7 +252,17 @@ export class ReportLoader extends HTMLElement {
       const hypotheses = buildComponentHypotheses(clusters, totalPages);
       // Pass the source-report id as the workspace id so task ids are stable and
       // report-scoped (status never leaks between reports).
-      const tasks = buildRemediationTasks(clusters, hypotheses, totalPages, null, null, sourceReport.id);
+      // Technology context: honour the user's confirmation/rejection and any
+      // forward-compatible technologies[] the report carries.
+      const techState = technologyStore.state;
+      const scanMetadata = detection.parsedData?.technologies ? { technologies: detection.parsedData.technologies } : null;
+      const tasks = buildRemediationTasks(
+        clusters, hypotheses, totalPages,
+        techState.confirmed || null,
+        scanMetadata,
+        sourceReport.id,
+        techState.rejected || []
+      );
 
       // Merge into the workspace's source-report registry (supports multiple
       // imported reports over a session).
