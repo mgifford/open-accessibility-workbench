@@ -1,0 +1,266 @@
+{
+  "issueNumber": 347,
+  "issueUrl": "https://github.com/mgifford/open-scans/issues/347",
+  "issueTitle": "SCAN: Drupal Camp Asheville",
+  "scanTitle": "Drupal Camp Asheville",
+  "submittedBy": "tea-sharp",
+  "engines": [
+    "axe",
+    "qualweb"
+  ],
+  "scanContext": {
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "viewportPreset": "desktop",
+    "colorScheme": "both",
+    "browser": "firefox"
+  },
+  "scannedAt": "2026-08-20T17:07:27.574Z",
+  "totalElapsedMs": 33045,
+  "totalSubmitted": 2,
+  "acceptedCount": 2,
+  "scannedCount": 2,
+  "skippedDueToTimeout": 0,
+  "skippedDueToErrAborted": 0,
+  "rejectedCount": 0,
+  "rejected": [],
+  "axeTotals": {
+    "passed": 910,
+    "failed": 34,
+    "cantTell": 15,
+    "inapplicable": 90
+  },
+  "qualwebTotals": {
+    "passed": 397,
+    "failed": 19,
+    "cantTell": 104,
+    "inapplicable": 9
+  },
+  "_fixtureNote": "FAITHFUL SUBSET of the real Open Scans issue #347 report. Top-level metadata and per-page counts/failedRules are preserved verbatim from upstream; each page's failures[] array is a CURATED SUBSET (not the full set). See FIXTURE_MANIFEST.md for provenance, the upstream URL, and exactly which findings were kept vs. omitted.",
+  "results": [
+    {
+      "submittedUrl": "https://www.drupalasheville.com/",
+      "finalUrl": "https://www.drupalasheville.com/",
+      "redirected": false,
+      "statusCode": 200,
+      "ok": true,
+      "contentType": "text/html; charset=UTF-8",
+      "pageTitle": "Drupal Asheville | Thu, 9 Jul 2026 - 12:00 - Sun, 12 Jul 2026 - 12:00 | Asheville, NC | Drupal Camp Asheville",
+      "elapsedMs": 17650,
+      "error": null,
+      "scanContext": {
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "viewportPreset": "desktop",
+        "colorScheme": "both",
+        "browser": "firefox"
+      },
+      "axe": {
+        "executed": true,
+        "error": null,
+        "counts": {
+          "passed": 453,
+          "failed": 24,
+          "cantTell": 7,
+          "inapplicable": 48
+        },
+        "failedRules": [
+          "color-contrast",
+          "link-name",
+          "region"
+        ],
+        "failures": [
+          {
+            "rule": "color-contrast",
+            "ruleUrl": "https://dequeuniversity.com/rules/axe/4.12/color-contrast?application=playwright",
+            "impact": "serious",
+            "wcagSc": [
+              "wcag2aa",
+              "wcag143"
+            ],
+            "xpath": "article[data-history-node-id=\"551\"] > header > .node__meta > .node__byline > .node__author > span > a[title=\"View user profile.\"][href$=\"amyjune-hineline\"]",
+            "html": "<a title=\"View user profile.\" href=\"/u/amyjune-hineline\">AmyJune Hineline</a>",
+            "message": "Elements must meet minimum color contrast ratio thresholds",
+            "fixSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.19 (foreground color: #f26321, background color: #ffffff, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "relatedPaths": [
+              "main"
+            ],
+            "colorScheme": "light",
+            "isDuplicate": false,
+            "duplicateOf": null,
+            "fingerprint": "88a3ae653277",
+            "firstSeenAt": "2026-08-20T17:07:27.574Z",
+            "patternId": "A11Y-c4df9034",
+            "a11yPatternFingerprint": "7eb7c1914a8fade9544b105baf207a0fb9ee680ed76926daaec6a4ad835554e5",
+            "a11yPatternDisplayId": "A11Y-PAT-7EB7C1914A8F",
+            "a11yOccurrenceFingerprint": "136ecb56d2b8019210ef71c4adcc13c5f1028381ac56cc2c2ecf4c328e5ccb53",
+            "a11yOccurrenceDisplayId": "A11Y-OCC-136ECB56D2B8"
+          },
+          {
+            "rule": "link-name",
+            "ruleUrl": "https://dequeuniversity.com/rules/axe/4.12/link-name?application=playwright",
+            "impact": "serious",
+            "wcagSc": [
+              "wcag2a",
+              "wcag244",
+              "wcag412"
+            ],
+            "xpath": ".social-media-link-icon--linkedin",
+            "html": "<a class=\"social-media-link-icon--linkedin\" href=\"https://www.linkedin.com/company/drupal-asheville/\">\n        <span class=\"fab fa-linkedin fa-2x\"></span>\n      </a>",
+            "message": "Links must have discernible text",
+            "fixSummary": "Fix all of the following:\n  Element is in tab order and does not have accessible text\n\nFix any of the following:\n  Element does not have text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute",
+            "relatedPaths": null,
+            "colorScheme": "light",
+            "isDuplicate": false,
+            "duplicateOf": null,
+            "fingerprint": "7c88e89b3c3d",
+            "firstSeenAt": "2026-08-20T17:07:27.574Z",
+            "patternId": "A11Y-0fa23e4b",
+            "a11yPatternFingerprint": "7947e7825c01d753384efc49a64732bea84137613e7b7ae512515a84e9ee5b89",
+            "a11yPatternDisplayId": "A11Y-PAT-7947E7825C01",
+            "a11yOccurrenceFingerprint": "cf53788d370dc162f397be361b898ad5073b99f376c3119dc1642561b198df0a",
+            "a11yOccurrenceDisplayId": "A11Y-OCC-CF53788D370D"
+          },
+          {
+            "rule": "region",
+            "ruleUrl": "https://dequeuniversity.com/rules/axe/4.12/region?application=playwright",
+            "impact": "moderate",
+            "wcagSc": [],
+            "xpath": ".site-hero__title",
+            "html": "<h1 class=\"site-hero__title\">\n      Drupal Camp Asheville\n          </h1>",
+            "message": "All page content should be contained by landmarks",
+            "fixSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
+            "relatedPaths": null,
+            "colorScheme": "light",
+            "isDuplicate": false,
+            "duplicateOf": null,
+            "fingerprint": "2e18171c7926",
+            "firstSeenAt": "2026-08-20T17:07:27.574Z",
+            "patternId": "A11Y-ea056e5a",
+            "a11yPatternFingerprint": "5a0308d4eed4ed8ce9b65f83f534191486a340d7299a2e15d2c43e3486b4c557",
+            "a11yPatternDisplayId": "A11Y-PAT-5A0308D4EED4",
+            "a11yOccurrenceFingerprint": "561d26faaebfdc7fb3e43e1bcbea27e300a18b9e4ef46020a09b88f6ca9a492d",
+            "a11yOccurrenceDisplayId": "A11Y-OCC-561D26FAAEBF"
+          }
+        ]
+      },
+      "qualweb": {
+        "executed": true,
+        "error": null,
+        "counts": {
+          "passed": 209,
+          "failed": 13,
+          "cantTell": 54,
+          "inapplicable": 8
+        },
+        "failedRules": [
+          "QW-ACT-R37",
+          "QW-ACT-R76"
+        ],
+        "failures": [
+          {
+            "rule": "QW-ACT-R37",
+            "ruleUrl": "https://www.w3.org/WAI/standards-guidelines/act/rules/afw4f7/",
+            "impact": "serious",
+            "wcagSc": [],
+            "description": "Element has contrast ratio lower than minimum.",
+            "xpath": null,
+            "selector": null,
+            "html": null,
+            "message": "Element has contrast ratio lower than minimum.",
+            "isDuplicate": false,
+            "duplicateOf": null,
+            "fingerprint": "2861ff3a84cc",
+            "firstSeenAt": "2026-08-20T17:07:27.574Z",
+            "patternId": "A11Y-45287c55",
+            "a11yPatternFingerprint": "7952bf6a687e0f89d68399a9a798065fbe932342323bce1a68d2da94689b404d",
+            "a11yPatternDisplayId": "A11Y-PAT-7952BF6A687E",
+            "a11yOccurrenceFingerprint": "ece89db9aa2940d5437c435ea3749dc0afa94506cc126049ab63c448b1e67b9a",
+            "a11yOccurrenceDisplayId": "A11Y-OCC-ECE89DB9AA29"
+          }
+        ]
+      }
+    },
+    {
+      "submittedUrl": "https://www.drupalasheville.com/events/2026/schedule",
+      "finalUrl": "https://www.drupalasheville.com/events/2026/schedule",
+      "redirected": false,
+      "statusCode": 200,
+      "ok": true,
+      "contentType": "text/html; charset=UTF-8",
+      "pageTitle": "Schedule | Drupal Asheville",
+      "elapsedMs": 15395,
+      "error": null,
+      "scanContext": {
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "viewportPreset": "desktop",
+        "colorScheme": "both",
+        "browser": "firefox"
+      },
+      "axe": {
+        "executed": true,
+        "error": null,
+        "counts": {
+          "passed": 457,
+          "failed": 10,
+          "cantTell": 8,
+          "inapplicable": 42
+        },
+        "failedRules": [
+          "color-contrast",
+          "heading-order",
+          "link-name",
+          "region"
+        ],
+        "failures": [
+          {
+            "rule": "link-name",
+            "ruleUrl": "https://dequeuniversity.com/rules/axe/4.12/link-name?application=playwright",
+            "impact": "serious",
+            "wcagSc": [
+              "wcag2a",
+              "wcag244",
+              "wcag412"
+            ],
+            "xpath": ".breadcrumb__link[href$=\"schedule\"]",
+            "html": "<a href=\"/events/2026/schedule\" class=\"breadcrumb__link\">Schedule</a>",
+            "message": "Links must have discernible text",
+            "fixSummary": "Fix all of the following:\n  Element is in tab order and does not have accessible text\n\nFix any of the following:\n  Element does not have text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute",
+            "relatedPaths": null,
+            "colorScheme": "light",
+            "isDuplicate": false,
+            "duplicateOf": null,
+            "fingerprint": "8c1d2c36e2b4",
+            "firstSeenAt": "2026-08-20T17:07:27.574Z",
+            "patternId": "A11Y-7eaac1e8",
+            "a11yPatternFingerprint": "c5f6e29d8e47f3a8b2c1d9f4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3aa",
+            "a11yPatternDisplayId": "A11Y-PAT-C5F6E29D8E47",
+            "a11yOccurrenceFingerprint": "d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6dd11",
+            "a11yOccurrenceDisplayId": "A11Y-OCC-D7E8F9A0B1C2"
+          }
+        ]
+      },
+      "qualweb": {
+        "executed": true,
+        "error": null,
+        "counts": {
+          "passed": 188,
+          "failed": 6,
+          "cantTell": 50,
+          "inapplicable": 1
+        },
+        "failedRules": [
+          "QW-ACT-R37"
+        ],
+        "failures": []
+      }
+    }
+  ]
+}

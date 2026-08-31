@@ -62,17 +62,14 @@ export class ReportLoader extends HTMLElement {
 
     sampleOsBtn.addEventListener('click', async () => {
       try {
-        const res = await fetch('tests/fixtures/open-scans/report.json');
-        if (!res.ok) throw new Error('Could not fetch fixture');
-        const text = await res.text();
+        const text = await this.fetchSample('open-scans/report.json');
 
         // Sibling discovery: an Open Scans report.json is normally accompanied
         // by report-overlap.json. Load it too so scanner stats display; its
         // absence must not break the primary import.
         let overlapText = null;
         try {
-          const overlapRes = await fetch('tests/fixtures/open-scans/report-overlap.json');
-          if (overlapRes.ok) overlapText = await overlapRes.text();
+          overlapText = await this.fetchSample('open-scans/report-overlap.json');
         } catch { /* overlap is optional */ }
 
         this.processFileContent(text, 'report.json', overlapText);
@@ -83,14 +80,25 @@ export class ReportLoader extends HTMLElement {
 
     sampleOobeeBtn.addEventListener('click', async () => {
       try {
-        const res = await fetch('tests/fixtures/oobee/report.csv');
-        if (!res.ok) throw new Error('Could not fetch fixture');
-        const text = await res.text();
+        const text = await this.fetchSample('oobee/report.csv');
         this.processFileContent(text, 'report.csv');
       } catch (err) {
         this.showError('Could not load sample file: ' + err.message);
       }
     });
+  }
+
+  /**
+   * Fetches a bundled sample report from the app's own origin. Samples live
+   * under public/samples so Vite copies them into the production build (unlike
+   * tests/fixtures, which is not shipped). BASE_URL keeps this correct under a
+   * GitHub Pages subpath deployment.
+   */
+  async fetchSample(relPath) {
+    const base = import.meta.env.BASE_URL || '/';
+    const res = await fetch(`${base}samples/${relPath}`);
+    if (!res.ok) throw new Error(`sample not found (HTTP ${res.status})`);
+    return res.text();
   }
 
   loadFile(file) {
