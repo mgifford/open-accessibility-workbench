@@ -71,10 +71,19 @@ All four are corrected here.
 
 ## report-overlap.json
 
-Companion cross-engine overlap statistics for issue #347. Scanner stats and
-overlap entries; `scannersInUse` = `["axe","qualweb"]`. (Not yet re-verified
-field-by-field against upstream `report-overlap.json`; flagged for a follow-up
-pass.)
+Companion cross-engine overlap statistics for issue #347, **verified verbatim
+against upstream** (same source directory, retrieved 2026-08-30). Preserved
+faithfully:
+- `scannersInUse` = `["axe","qualweb"]` (only engines that produced findings).
+- `scannerStats` includes all five configured scanners — axe (34 failed),
+  alfa/equalAccess/accesslint (0), qualweb (19) — with the real
+  `label`/`failed`/`uniqueFailed`/`duplicates` shape.
+- `matrix` keyed by axe + qualweb; `duplicateFindingTotals` = 15;
+  `overlapEntryCount`/`actConsensusEntryCount` = 0 (empty entry arrays).
+
+Note the distinction the adapter preserves: `duplicateFindingTotals` (15) is
+within/across-scanner duplicate findings and is **not** the same as
+cross-scanner overlap (`overlapEntries`, empty here).
 
 ## report.csv
 

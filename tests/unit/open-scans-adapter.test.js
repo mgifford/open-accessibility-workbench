@@ -71,8 +71,20 @@ describe('Open Scans Adapter Contract', () => {
     const result = parseOpenScansOverlapJson(raw);
 
     assert.equal(result.system, 'open-scans');
+    // scannersInUse lists only the engines that actually ran findings...
     assert.deepEqual(result.scannersInUse, ['axe', 'qualweb']);
     assert.equal(result.scannerStats.axe.failed, 34);
+    assert.equal(result.scannerStats.qualweb.failed, 19);
+    // ...but scannerStats faithfully includes all five configured scanners,
+    // including the ones with zero failures (real upstream shape).
+    assert.deepEqual(
+      Object.keys(result.scannerStats).sort(),
+      ['accesslint', 'alfa', 'axe', 'equalAccess', 'qualweb']
+    );
+    assert.equal(result.scannerStats.alfa.failed, 0);
+    // duplicateFindingTotals is distinct from cross-scanner overlap (0 here).
+    assert.equal(result.duplicateFindingTotals, 15);
+    assert.deepEqual(result.overlapEntries, []);
   });
 
   test('correctly parses summary report.csv', () => {
