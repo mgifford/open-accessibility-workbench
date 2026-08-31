@@ -64,7 +64,17 @@ export class ReportLoader extends HTMLElement {
         const res = await fetch('tests/fixtures/open-scans/report.json');
         if (!res.ok) throw new Error('Could not fetch fixture');
         const text = await res.text();
-        this.processFileContent(text, 'report.json');
+
+        // Sibling discovery: an Open Scans report.json is normally accompanied
+        // by report-overlap.json. Load it too so scanner stats display; its
+        // absence must not break the primary import.
+        let overlapText = null;
+        try {
+          const overlapRes = await fetch('tests/fixtures/open-scans/report-overlap.json');
+          if (overlapRes.ok) overlapText = await overlapRes.text();
+        } catch { /* overlap is optional */ }
+
+        this.processFileContent(text, 'report.json', overlapText);
       } catch (err) {
         this.showError('Could not load sample file: ' + err.message);
       }
@@ -93,7 +103,7 @@ export class ReportLoader extends HTMLElement {
     reader.readAsText(file);
   }
 
-  processFileContent(content, filename) {
+  processFileContent(content, filename, overlapContent = null) {
     const errorBox = this.querySelector('#error-container');
     errorBox.style.display = 'none';
 
@@ -106,18 +116,51 @@ export class ReportLoader extends HTMLElement {
 
       let observations = [];
       let totalPages = 1;
+      let rawTotals = null;
+      let engines = [];
+      let pageSummaries = null;
       let sourceSummary = { system: detection.system, format: detection.format, filename };
 
       if (detection.type === REPORT_TYPES.OPEN_SCANS_JSON) {
         const parsed = parseOpenScansReportJson(detection.parsedData || content, filename);
         observations = parsed.observations;
         totalPages = parsed.totalPages;
-        sourceSummary = { ...sourceSummary, scanId: parsed.scanId, scanTitle: parsed.scanTitle, totalPages };
+        rawTotals = parsed.rawTotals;
+        engines = parsed.engines;
+        sourceSummary = {
+          ...sourceSummary, scanId: parsed.scanId, scanTitle: parsed.scanTitle,
+          issueNumber: parsed.issueNumber, totalPages, engines
+        };
+      } else if (detection.type === REPORT_TYPES.OPEN_SCANS_CSV) {
+        // Page-level summary CSV: no finding-level evidence, but real per-page
+        // and per-engine failure counts the overview can display truthfully.
+        const parsed = parseOpenScansReportCsv(detection.parsedData || content);
+        totalPages = parsed.totalPages;
+        pageSummaries = parsed.pages;
+        rawTotals = summarizeCsvTotals(parsed.pages);
+        sourceSummary = {
+          ...sourceSummary, scanId: String(parsed.pages[0]?.issueNumber || 'open-scans-csv'),
+          scanTitle: parsed.pages[0]?.scanTitle || '', totalPages, granularity: 'page'
+        };
       } else if (detection.type === REPORT_TYPES.OOBEE_CSV) {
         const parsed = parseOobeeReportCsv(detection.parsedData || content, filename);
         observations = parsed.observations;
         totalPages = parsed.totalPages;
         sourceSummary = { ...sourceSummary, scanId: 'oobee-csv', totalPages };
+      } else {
+        this.showError(
+          `The "${detection.type}" format is recognized but not yet supported for full ingestion in this view.\n\n` +
+          detection.explanation || ''
+        );
+        return;
+      }
+
+      // Attach cross-scanner overlap statistics when available.
+      let overlapData = null;
+      if (overlapContent) {
+        try {
+          overlapData = parseOpenScansOverlapJson(overlapContent);
+        } catch { /* overlap is optional; ignore a malformed sibling */ }
       }
 
       const enriched = enrichObservationsWithSignatures(observations);
@@ -127,11 +170,12 @@ export class ReportLoader extends HTMLElement {
 
       workspaceStore.setState({
         loaded: true,
-        sourceSummary,
+        sourceSummary: { ...sourceSummary, rawTotals, pageSummaries },
         observations: enriched,
         clusters,
         hypotheses,
         tasks,
+        overlapData,
         statusMessage: `Report loaded. ${observations.length} observations analyzed into ${tasks.length} remediation tasks.`
       });
 
@@ -146,7 +190,25 @@ export class ReportLoader extends HTMLElement {
     const errorBox = this.querySelector('#error-container');
     errorBox.textContent = msg;
     errorBox.style.display = 'block';
+    // role="alert" announces automatically; make the error keyboard-reachable
+    // so a keyboard-only user lands on the explanation.
+    errorBox.setAttribute('tabindex', '-1');
+    errorBox.focus();
   }
+}
+
+/**
+ * Rolls up an Open Scans summary CSV's per-page rows into artifact-level totals
+ * for display. These are page-summary counts, not finding-level evidence.
+ */
+function summarizeCsvTotals(pages = []) {
+  const sum = (key) => pages.reduce((acc, p) => acc + (p[key] || 0), 0);
+  return {
+    axe: { failed: sum('axeFailed'), passed: sum('axePassed') },
+    qualweb: { failed: sum('qualwebFailed') },
+    alfa: { failed: sum('alfaFailed') },
+    duplicateFindings: sum('duplicateFindings')
+  };
 }
 
 customElements.define('report-loader', ReportLoader);

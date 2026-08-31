@@ -14,8 +14,82 @@ export class ReportOverview extends HTMLElement {
     if (this.unsubscribeProfile) this.unsubscribeProfile();
   }
 
+  /**
+   * Renders a scan-source summary the user can check against the original
+   * report artifacts: engines run, pages scanned, and per-scanner failure
+   * counts. Prefers cross-scanner overlap stats (label + failed + duplicates)
+   * when present, else the report's own rawTotals. Uses a semantic table.
+   */
+  renderScanSummary(sourceSummary, overlapData) {
+    if (!sourceSummary) return '';
+
+    const engines = sourceSummary.engines || [];
+    const totalPages = sourceSummary.totalPages;
+    const stats = overlapData?.scannerStats || null;
+    const rawTotals = sourceSummary.rawTotals || null;
+
+    // Build rows from overlap scannerStats when available (richest, real
+    // upstream shape), otherwise fall back to rawTotals.
+    let rows = [];
+    if (stats) {
+      rows = Object.entries(stats).map(([id, s]) => ({
+        label: s.label || id,
+        failed: s.failed ?? 0,
+        unique: s.uniqueFailed,
+        duplicates: s.duplicates
+      }));
+    } else if (rawTotals) {
+      rows = Object.entries(rawTotals)
+        .filter(([, v]) => v && typeof v === 'object' && 'failed' in v)
+        .map(([id, v]) => ({ label: id, failed: v.failed ?? 0, unique: undefined, duplicates: undefined }));
+    }
+
+    if (rows.length === 0 && !totalPages) return '';
+
+    const hasOverlapCols = rows.some(r => r.unique !== undefined || r.duplicates !== undefined);
+
+    return `
+      <section class="card" aria-labelledby="scan-summary-title" style="margin-bottom: var(--space-6);">
+        <h3 id="scan-summary-title" class="card-title">Scan Source Summary</h3>
+        <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin: var(--space-2) 0 var(--space-4);">
+          Counts reported by the source scan artifact${overlapData ? ' (including cross-scanner overlap statistics)' : ''}.
+          These should agree with the original report.
+        </p>
+        <dl style="display: flex; gap: var(--space-6); flex-wrap: wrap; margin-bottom: var(--space-4);">
+          ${engines.length ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Engines</dt><dd style="font-weight: 600;">${engines.join(', ')}</dd></div>` : ''}
+          ${totalPages ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Pages scanned</dt><dd style="font-weight: 600;">${totalPages}</dd></div>` : ''}
+          ${overlapData?.duplicateFindingTotals != null ? `<div><dt style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Duplicate findings</dt><dd style="font-weight: 600;">${overlapData.duplicateFindingTotals}</dd></div>` : ''}
+        </dl>
+        ${rows.length ? `
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: var(--font-size-sm);">
+            <caption class="sr-only">Findings failed per scanner engine</caption>
+            <thead>
+              <tr style="text-align: left; border-bottom: 2px solid var(--color-border);">
+                <th scope="col" style="padding: var(--space-2);">Scanner</th>
+                <th scope="col" style="padding: var(--space-2); text-align: right;">Failed</th>
+                ${hasOverlapCols ? `<th scope="col" style="padding: var(--space-2); text-align: right;">Unique</th><th scope="col" style="padding: var(--space-2); text-align: right;">Duplicates</th>` : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr style="border-bottom: 1px solid var(--color-border);">
+                  <th scope="row" style="padding: var(--space-2); font-weight: 600;">${r.label}</th>
+                  <td style="padding: var(--space-2); text-align: right;">${r.failed}</td>
+                  ${hasOverlapCols ? `<td style="padding: var(--space-2); text-align: right;">${r.unique ?? '—'}</td><td style="padding: var(--space-2); text-align: right;">${r.duplicates ?? '—'}</td>` : ''}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ${sourceSummary.granularity === 'page' ? `<p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">This is a page-level summary CSV; it does not contain finding-level selectors or HTML.</p>` : ''}
+        ` : ''}
+      </section>
+    `;
+  }
+
   render() {
-    const { loaded, observations, clusters, hypotheses, tasks, sourceSummary } = workspaceStore.state;
+    const { loaded, observations, clusters, hypotheses, tasks, sourceSummary, overlapData } = workspaceStore.state;
     const { selectedCapabilities } = profileStore.state;
 
     if (!loaded) {
@@ -44,6 +118,8 @@ export class ReportOverview extends HTMLElement {
           </div>
           <a href="#/tasks" class="btn btn-primary">View All Tasks (${tasks.length})</a>
         </div>
+
+        ${this.renderScanSummary(sourceSummary, overlapData)}
 
         <!-- Reduction Waterfall -->
         <div class="reduction-waterfall" aria-label="Reduction Metrics Waterfall">
