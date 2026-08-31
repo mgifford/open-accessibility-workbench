@@ -129,3 +129,29 @@ as the eval set is version-controlled in-repo.
 When AI is used, exports include `{ generatedByAI: true, model, modelRevision,
 runtime, device, guidanceSources, validation, generatedAt }`. When AI is not
 used, exports include `{ generatedByAI: false }`.
+
+## Deterministic AI Validation (Phase 12)
+
+A generated candidate is never presented as successful merely because a model
+produced it. `src/ai/validation-loop.js` runs a **bounded** generate → validate →
+feedback → retry loop (max **2** attempts):
+
+- Each candidate passes through the response processor (structure + invention
+  safety), then the deterministic validators (`src/validation/`).
+- On failure, **exact** feedback is fed to a single retry. After a second
+  failure the loop stops and returns deterministic guidance — `finalCandidate`
+  is `null`, so a failed candidate is not surfaced.
+- Cancellation is honoured between attempts.
+
+Honest statuses only — "Structural check passed", "Contrast check passed",
+"Alternative mechanism present", "Automated check failed", "Insufficient evidence
+to validate", "Requires page-level verification". Never "WCAG fixed / compliant /
+solved / guaranteed". A rule-specific validator that lacks its required evidence
+(e.g. contrast without explicit colours) returns **insufficient-evidence**, not a
+false pass.
+
+`buildValidationExport()` records each attempt for export (§12.6):
+`{ validator, validatorVersion, attempt, status: passed|failed|insufficient-evidence,
+inputs, results, manualVerificationRequired }`, plus whether the final candidate
+differs from the first attempt. These checks do not prove accessibility;
+meaningfulness (alt text wording, link purpose) always requires human review.
