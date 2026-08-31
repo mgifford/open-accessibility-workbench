@@ -5,16 +5,33 @@
  * persisted — see PRIVACY.md).
  */
 
-export const TASK_STATUSES = ['open', 'in-progress', 'needs-decision', 'done'];
+// Full lifecycle. `new` is the default (untriaged); `ready` marks triaged,
+// actionable work; `blocked` is an external dependency (distinct from
+// `needs-decision`, an unresolved human decision); `needs-verification` keeps
+// implementation-complete distinct from accessibility-verified; `deferred` is an
+// intentional not-now decision (distinct from unfinished `new`).
+export const TASK_STATUSES = [
+  'new', 'ready', 'in-progress', 'blocked', 'needs-decision', 'needs-verification', 'done', 'deferred'
+];
 
 export const TASK_STATUS_LABELS = {
-  'open': 'Open',
+  'new': 'New',
+  'ready': 'Ready',
   'in-progress': 'In progress',
+  'blocked': 'Blocked',
   'needs-decision': 'Needs decision',
-  'done': 'Done'
+  'needs-verification': 'Needs verification',
+  'done': 'Done',
+  'deferred': 'Deferred'
 };
 
-const STORAGE_KEY = 'oaw.taskStatus.v1';
+const DEFAULT_STATUS = 'new';
+
+// Migration from the previous reduced lifecycle (v1) to the full model (v2).
+const STATUS_MIGRATIONS = { 'open': 'new' };
+
+const STORAGE_KEY = 'oaw.taskStatus.v2';
+const LEGACY_STORAGE_KEY = 'oaw.taskStatus.v1';
 
 class TaskStatusStore {
   constructor() {
@@ -27,12 +44,15 @@ class TaskStatusStore {
 
   _loadIfEnabled() {
     try {
-      const raw = safeGet(STORAGE_KEY);
+      let raw = safeGet(STORAGE_KEY);
+      let fromLegacy = false;
+      if (!raw) { raw = safeGet(LEGACY_STORAGE_KEY); fromLegacy = Boolean(raw); }
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
-          this.byId = parsed.byId || {};
+          this.byId = this._migrate(parsed.byId || {});
           this.persist = Boolean(parsed.persist);
+          if (fromLegacy && this.persist) this._save(); // rewrite under v2 key
         }
       }
     } catch {
@@ -40,6 +60,18 @@ class TaskStatusStore {
       this.byId = {};
       this.persist = false;
     }
+  }
+
+  /** Migrates stored statuses to the current schema, dropping unknown values. */
+  _migrate(byId) {
+    const out = {};
+    for (const [id, status] of Object.entries(byId || {})) {
+      const migrated = STATUS_MIGRATIONS[status] || status;
+      if (TASK_STATUSES.includes(migrated) && migrated !== DEFAULT_STATUS) {
+        out[id] = migrated;
+      }
+    }
+    return out;
   }
 
   _save() {
@@ -60,15 +92,15 @@ class TaskStatusStore {
     for (const l of this.listeners) l(this.byId);
   }
 
-  /** Returns the status for a task, defaulting to 'open'. */
+  /** Returns the status for a task, defaulting to 'new'. */
   get(taskId) {
-    return this.byId[taskId] || 'open';
+    return this.byId[taskId] || DEFAULT_STATUS;
   }
 
   /** Sets a task's status; no-op for unknown status values. */
   set(taskId, status) {
     if (!TASK_STATUSES.includes(status)) return;
-    if (status === 'open') {
+    if (status === DEFAULT_STATUS) {
       delete this.byId[taskId];
     } else {
       this.byId[taskId] = status;
@@ -90,7 +122,7 @@ class TaskStatusStore {
 
   /** Counts of each status across the given task ids (for summaries). */
   summary(taskIds = []) {
-    const counts = { open: 0, 'in-progress': 0, 'needs-decision': 0, done: 0 };
+    const counts = Object.fromEntries(TASK_STATUSES.map(s => [s, 0]));
     for (const id of taskIds) counts[this.get(id)]++;
     return counts;
   }

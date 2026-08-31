@@ -249,7 +249,9 @@ export class ReportLoader extends HTMLElement {
       const enriched = enrichObservationsWithSignatures(observations);
       const clusters = clusterPatternOccurrences(enriched, totalPages);
       const hypotheses = buildComponentHypotheses(clusters, totalPages);
-      const tasks = buildRemediationTasks(clusters, hypotheses, totalPages);
+      // Pass the source-report id as the workspace id so task ids are stable and
+      // report-scoped (status never leaks between reports).
+      const tasks = buildRemediationTasks(clusters, hypotheses, totalPages, null, null, sourceReport.id);
 
       // Merge into the workspace's source-report registry (supports multiple
       // imported reports over a session).

@@ -121,16 +121,26 @@ interface CanonicalObservation {
 
 ```typescript
 interface RemediationTask {
-  id: string; // e.g. "TASK-link-name-social-links"
+  // STABLE, REPORT-SCOPED id: TASK-<sourceReportId>-<remediationFamily>-<hash of
+  // sorted member pattern/cluster identities>. It does not depend on input order,
+  // so task status stays attached to the same work across re-analysis, and never
+  // collides between reports.
+  id: string;
   title: string;
   summary: string;
-  ruleId: string;
+  ruleId: string;         // the task's primary rule (stable within its family)
+  ruleIds: string[];      // every rule consolidated into this task (sorted)
+  remediationFamily: string; // the implementation action (e.g. "accessible-name",
+                             // "contrast"); tasks consolidate by component AND family
+  consolidated: boolean;  // true when >1 pattern cluster was merged
+  patternClusterIds: string[]; // the pattern clusters this task covers
   wcag: string[];
   urgency: "critical" | "high" | "medium" | "low";
   leverage: "very-high" | "high" | "medium" | "low";
   metrics: {
     observationCount: number;
     correlatedFindingCount: number;
+    patternVariantCount: number; // number of pattern clusters consolidated
     affectedPagesCount: number;
     totalPagesCount: number;
     pagesPercentage: number;
@@ -142,9 +152,10 @@ interface RemediationTask {
   } | null;
   roles: {
     primary: string;
+    coPrimary: string[];
     secondary: string[];
     contributors: string[];
-    source: "W3C ARRM" | "Workbench WCAG 2.2 Extension";
+    source: "w3c-arrm" | "workbench-inference";
   };
   technologyContext: {
     name: string | null;
@@ -164,3 +175,29 @@ interface RemediationTask {
   observations: CanonicalObservation[];
 }
 ```
+
+## 4. Task lifecycle & status storage
+
+Task status is tracked separately from the derived task objects (in
+`src/state/task-status.js`) so it survives re-analysis without altering evidence.
+
+Lifecycle states: `new` (default, untriaged), `ready` (triaged, actionable),
+`in-progress`, `blocked` (external dependency), `needs-decision` (unresolved human
+decision), `needs-verification` (implemented, not yet accessibility-verified),
+`done`, `deferred` (intentional not-now). `new`/`ready`/`blocked`/`deferred` are
+deliberately distinct so untriaged, actionable, externally-blocked, and
+intentionally-postponed work are never conflated.
+
+**Storage scope.** Status is keyed by the stable, report-scoped task id, so it
+cannot transfer between tasks (order-independent ids) or between reports
+(report-scoped ids). Persistence is **opt-in** via a control in the task list;
+when off, status lives only in memory for the session. Only task statuses are
+stored — never report evidence. A stored schema is migrated on load (legacy
+`open` → `new`) and unknown states are dropped. See PRIVACY.md.
+
+### Known limitations
+- Task titles/blueprints for a family are drawn from the family's first
+  (sorted) member cluster; this is safe because a family is homogeneous by
+  construction, but multi-example rendering per family is not yet implemented.
+- A source-report content hash is stored, but observations are not yet
+  byte-reconstructable from the model (see §2).

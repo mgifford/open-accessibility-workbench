@@ -46,7 +46,7 @@ export class TaskList extends HTMLElement {
       'needs-design': ({ task }) => roleInvolved(task, 'Visual Design') || roleInvolved(task, 'UX'),
       'ready-dev': ({ task }) => roleInvolved(task, 'Development'),
       'needs-a11y-review': ({ task }) => (task.blueprint?.humanDecisionsRequired?.length || 0) > 0 || roleInvolved(task, 'Testing'),
-      'ready-verification': ({ task }) => taskStatusStore.get(task.id) === 'in-progress' || taskStatusStore.get(task.id) === 'done',
+      'ready-verification': ({ task }) => taskStatusStore.get(task.id) === 'needs-verification',
       'needs-another-role': ({ route }) => route.relevance === 'handoff'
     };
     const predicate = viewPredicates[this.filterView] || viewPredicates['all'];
@@ -71,7 +71,7 @@ export class TaskList extends HTMLElement {
             <h2 class="card-title" style="font-size: var(--font-size-2xl);">Remediation Tasks</h2>
             <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
               ${filtered.length} actionable tasks (from ${tasks.length} total) &bull;
-              ${statusCounts.done} done, ${statusCounts['in-progress']} in progress, ${statusCounts['needs-decision']} need a decision, ${statusCounts.open} open
+              ${statusCounts.done} done, ${statusCounts['in-progress']} in progress, ${statusCounts['needs-verification']} awaiting verification, ${statusCounts.blocked} blocked, ${statusCounts['needs-decision']} need a decision, ${statusCounts.new + statusCounts.ready} not started
             </p>
             ${hiddenCount > 0 ? `<p style="font-size: var(--font-size-sm);">
               <strong>${hiddenCount}</strong> ${hiddenCount === 1 ? 'task is' : 'tasks are'} hidden by the current view.
@@ -115,6 +115,17 @@ export class TaskList extends HTMLElement {
               ${TASK_STATUSES.map(s => `<option value="${s}" ${this.filterStatus === s ? 'selected' : ''}>${TASK_STATUS_LABELS[s]}</option>`).join('')}
             </select>
           </div>
+
+          <div style="align-self: flex-end;">
+            <label style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm);">
+              <input type="checkbox" id="persist-status" ${taskStatusStore.persist ? 'checked' : ''} />
+              Save task statuses locally on this device
+            </label>
+            <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1); max-width: 32ch;">
+              Stores only task statuses for this report in your browser. Your report
+              contents are never saved. Untick to turn off and clear.
+            </p>
+          </div>
         </div>
 
         <!-- Task List -->
@@ -128,10 +139,11 @@ export class TaskList extends HTMLElement {
                     Rule: <code>${escapeHtml(t.ruleId)}</code> (WCAG ${escapeHtml(t.wcag.join(', ')) || 'N/A'})
                   </div>
                 </div>
-                <div style="display: flex; gap: var(--space-2); align-items: center;">
+                <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
                   ${t.consolidated ? `<span class="badge badge-medium">Consolidated: ${t.metrics.patternVariantCount} patterns</span>` : ''}
-                  <span class="badge badge-${escapeAttr(t.urgency)}">Urgency: ${escapeHtml(t.urgency)}</span>
-                  <span class="badge badge-high">Leverage: ${escapeHtml(t.leverage)}</span>
+                  <span class="badge badge-${escapeAttr(t.urgency)}" title="How severe/pressing the barrier is">Urgency: ${escapeHtml(t.urgency)}</span>
+                  <span class="badge badge-high" title="How many occurrences/pages this fix addresses">Leverage: ${escapeHtml(t.leverage)}</span>
+                  ${t.componentHypothesis ? `<span class="badge badge-medium" title="Confidence that these patterns share one component">Shared-component confidence: ${escapeHtml(t.componentHypothesis.confidence)}</span>` : ''}
                 </div>
               </div>
 
@@ -203,14 +215,39 @@ export class TaskList extends HTMLElement {
       });
     }
 
-    // Per-task status changes. The store notifies subscribers, which re-renders.
+    // Per-task status changes. Re-rendering replaces the whole list, so remember
+    // which control changed and restore focus to it afterwards (no lost place for
+    // keyboard/SR users), and announce the change politely.
     this.querySelectorAll('.task-status-select').forEach(sel => {
       sel.addEventListener('change', (e) => {
-        taskStatusStore.set(e.target.getAttribute('data-task-id'), e.target.value);
+        const taskId = e.target.getAttribute('data-task-id');
+        const label = TASK_STATUS_LABELS[e.target.value] || e.target.value;
+        this._restoreFocusTaskId = taskId;
+        this._pendingAnnounce = `Task status changed to ${label}.`;
+        taskStatusStore.set(taskId, e.target.value);
       });
     });
 
-    // Announce an applied filter politely, WITHOUT moving focus (spec §7.4).
+    // Persistence opt-in.
+    const persistToggle = this.querySelector('#persist-status');
+    if (persistToggle) {
+      persistToggle.addEventListener('change', (e) => {
+        taskStatusStore.setPersistence(e.target.checked);
+        this._pendingAnnounce = e.target.checked
+          ? 'Task statuses will be saved locally on this device.'
+          : 'Local task-status saving turned off and cleared.';
+      });
+    }
+
+    // Restore focus to a status control after a status-driven re-render.
+    if (this._restoreFocusTaskId) {
+      const target = this.querySelector(`.task-status-select[data-task-id="${CSS.escape(this._restoreFocusTaskId)}"]`);
+      if (target) target.focus();
+      this._restoreFocusTaskId = null;
+    }
+
+    // Announce applied filter / status change politely, WITHOUT moving focus for
+    // filter changes (spec §7.4).
     if (this._pendingAnnounce) {
       const announcer = this.querySelector('#filter-announcer');
       if (announcer) announcer.textContent = this._pendingAnnounce;
