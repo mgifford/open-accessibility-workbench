@@ -28,19 +28,23 @@ export function clusterPatternOccurrences(observations, totalPagesInScan = 1) {
     const occurrencesCount = group.observations.length;
     const pagesPercentage = Math.round((pagesCount / Math.max(totalPagesInScan, 1)) * 100);
 
-    // Grouping rationale explanation
-    const rationaleParts = [];
-    if (group.upstreamPatternId) {
-      rationaleParts.push(`Authoritative upstream pattern ID: ${group.upstreamPatternId}`);
+    // Grouping rationale — reports ONLY the basis actually used to form the
+    // group, so the explanation never claims evidence that was not compared.
+    const rationaleParts = [`Matching rule: ${group.ruleId}`];
+    if (group.basis === 'upstream-pattern-id') {
+      rationaleParts.push(`Same upstream pattern ID: ${group.upstreamPatternId} (occurrences the scanner assigned to one pattern; structure was not independently compared)`);
+    } else if (group.basis === 'structure-signature') {
+      rationaleParts.push(`Matching canonical structural DOM signature`);
+    } else {
+      rationaleParts.push(`Matching selector signature`);
     }
-    rationaleParts.push(`Matching rule: ${group.ruleId}`);
-    rationaleParts.push(`Matching structural DOM signature`);
     rationaleParts.push(`Occurs on ${pagesCount} ${pagesCount === 1 ? 'page' : 'pages'} (${occurrencesCount} total ${occurrencesCount === 1 ? 'occurrence' : 'occurrences'})`);
 
     return {
       id: `PAT-${group.ruleId}-${idx + 1}`,
       ruleId: group.ruleId,
       sourceRuleId: group.sourceRuleId,
+      groupingBasis: group.basis,
       upstreamPatternId: group.upstreamPatternId,
       familySignature: group.observations[0]?.signatures?.familySignature || null,
       representativeHtml: group.representativeHtml,

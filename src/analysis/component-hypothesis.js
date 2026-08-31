@@ -71,40 +71,58 @@ function familyLocatorRoot(locator = '') {
 function describeComponent(clusters, totalPagesInScan, idx) {
   const pageUrls = new Set();
   const ruleIds = new Set();
+  const upstreamIds = new Set();
   let occurrencesCount = 0;
-  let hasUpstream = false;
-  let memberInstances = clusters.length;
 
   for (const c of clusters) {
     (c.affectedPages || []).forEach(u => pageUrls.add(u));
     if (c.ruleId) ruleIds.add(c.ruleId);
     occurrencesCount += c.occurrencesCount || 0;
-    if (c.upstreamPatternId) hasUpstream = true;
+    if (c.upstreamPatternId) upstreamIds.add(c.upstreamPatternId);
   }
 
+  const patternVariants = clusters.length;      // distinct pattern clusters
   const pagesCount = pageUrls.size;
   const rep = clusters[0];
   const locator = (rep.representativeLocator || '').toLowerCase();
   const html = (rep.representativeHtml || '').toLowerCase();
 
+  // Distinguish "the scanner assigned these to ONE upstream pattern" from
+  // "these are DISTINCT upstream patterns that share a structural family".
+  const sharedUpstreamIdentity = upstreamIds.size === 1 && patternVariants > 1;
+  const distinctPatternsOneFamily = upstreamIds.size > 1 && patternVariants > 1;
+
   // Confidence with explicit signals (spec §13.6 — explainable, not numeric).
+  // Every signal reflects something actually measured; occurrences and pattern
+  // variants are reported as separate, accurate counts.
   const signals = [];
-  if (hasUpstream) signals.push('shared upstream pattern identity');
-  if (memberInstances > 1) signals.push(`${memberInstances} instances share one structural family`);
+  if (sharedUpstreamIdentity) {
+    signals.push(`same upstream pattern identity (${[...upstreamIds][0]})`);
+  } else if (distinctPatternsOneFamily) {
+    signals.push(`${patternVariants} distinct upstream patterns share one structural family`);
+  } else if (patternVariants > 1) {
+    signals.push(`${patternVariants} pattern variants share one structural family`);
+  }
+  if (occurrencesCount > patternVariants) {
+    signals.push(`${occurrencesCount} occurrences across ${patternVariants} pattern ${patternVariants === 1 ? 'variant' : 'variants'}`);
+  }
   if (pagesCount > 1) signals.push(`recurs on ${pagesCount} of ${totalPagesInScan} pages`);
   if (ruleIds.size > 1) signals.push(`spans ${ruleIds.size} related rules (${[...ruleIds].join(', ')})`);
 
+  // A shared structural family across multiple variants/pages is the primary
+  // high-confidence signal; a single shared upstream id also qualifies.
+  const familyReuse = patternVariants > 1 || pagesCount > 1;
   let confidence = 'low';
-  if ((hasUpstream && (memberInstances > 1 || pagesCount > 1)) ||
-      (memberInstances > 1 && pagesCount >= Math.max(2, Math.floor(totalPagesInScan * 0.5)))) {
+  if ((familyReuse && pagesCount >= Math.max(2, Math.floor(totalPagesInScan * 0.5))) ||
+      (sharedUpstreamIdentity && pagesCount > 1)) {
     confidence = 'high';
-  } else if (memberInstances > 1 || pagesCount > 1 || occurrencesCount >= 3) {
+  } else if (familyReuse || occurrencesCount >= 3) {
     confidence = 'medium';
   }
 
-  const name = nameComponent(locator, html, ruleIds, memberInstances, confidence);
+  const name = nameComponent(locator, html, ruleIds, patternVariants, confidence);
 
-  const shared = memberInstances > 1 || pagesCount > 1;
+  const shared = familyReuse;
   const rationale = shared
     ? `${confidence === 'high' ? 'Likely' : 'Possible'} shared component: ${signals.join('; ') || 'recurring structure'}.`
     : 'Isolated element: appears once, with no confirmed shared-template signals.';
@@ -113,6 +131,8 @@ function describeComponent(clusters, totalPagesInScan, idx) {
     id: `COMP-${idx}`,
     clusterId: rep.id,               // primary cluster (back-compat for callers)
     clusterIds: clusters.map(c => c.id),
+    patternVariants,
+    upstreamPatternIds: [...upstreamIds],
     name,
     confidence,
     confidenceSignals: signals,

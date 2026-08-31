@@ -32,7 +32,11 @@ export class PatternExplorer extends HTMLElement {
 
         <div style="display: flex; flex-direction: column; gap: var(--space-6);">
           ${clusters.map(c => {
-            const hyp = hypotheses.find(h => h.clusterId === c.id);
+            // A component hypothesis may span several pattern clusters; match on
+            // any member so every member pattern shows its component relationship.
+            const hyp = hypotheses.find(
+              h => h.clusterId === c.id || (Array.isArray(h.clusterIds) && h.clusterIds.includes(c.id))
+            );
             return `
               <article class="card" style="border-left: 4px solid var(--color-brand-primary);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2);">
