@@ -4,13 +4,20 @@ To preserve data provenance while correlating findings across multiple scanners,
 
 The model is **provenance-preserving**, not lossless: it retains each scanner's
 upstream identities (finding, pattern, occurrence, duplicate metadata), the
-originating scanner and record index, and the raw evidence (rendered HTML,
-locator, message, guidance). It does **not** currently store a hash of the source
-report, a stable JSON Pointer to the originating record, or a verbatim copy of
-the raw record — so a normalized observation cannot yet be byte-reconstructed
-from the model alone. Fields a scanner does not provide are simply absent; the
-normalizers do not invent values. (Adding a `source.recordPointer` and a source
-hash is tracked as a follow-up.)
+originating scanner, and the raw evidence (rendered HTML, locator, message,
+guidance). Every observation also carries `source.recordPointer` — a stable path
+to the exact source record (a JSON-pointer-style `/results/{page}/{engine}/failures/{i}`
+for Open Scans, `row:{i}` for the Oobee CSV) — plus `provenance.sourceRecordIndex`
+and, where the scanner provides none, a Workbench-derived `identity.sourceFindingId`
+(tagged `sourceFindingIdSource`). Together these let any normalized observation
+be located in the original artifact and traced across four axes: **source report,
+original record, scanner/tool, and page** (see `src/analysis/provenance.js` and
+the Phase 4 provenance tests).
+
+It does **not** yet store a hash of the source report or a verbatim copy of the
+raw record, so a normalized observation cannot be byte-reconstructed from the
+model alone. Fields a scanner does not provide are simply absent; the normalizers
+do not invent values. (A source-report hash is tracked as a follow-up.)
 
 ---
 

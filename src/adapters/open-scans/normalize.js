@@ -20,7 +20,8 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
   const observations = [];
   let recordIndex = 0;
 
-  for (const pageResult of openScansReport.results) {
+  for (let pageIndex = 0; pageIndex < openScansReport.results.length; pageIndex++) {
+    const pageResult = openScansReport.results[pageIndex];
     const page = {
       submittedUrl: pageResult.submittedUrl || '',
       finalUrl: pageResult.finalUrl || pageResult.submittedUrl || '',
@@ -36,11 +37,16 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
     for (const engine of engines) {
       const engineData = pageResult[engine];
       if (engineData && engineData.executed && Array.isArray(engineData.failures)) {
-        for (const failure of engineData.failures) {
+        for (let failureIndex = 0; failureIndex < engineData.failures.length; failureIndex++) {
+          const failure = engineData.failures[failureIndex];
           recordIndex++;
 
           // Extract WCAG SC tags (tokens like `wcag2aa`, `wcag143`).
           const wcag = parseWcagTags(failure.wcagSc);
+
+          // Stable JSON-pointer-style path to the exact source record, so a
+          // normalized observation can be located in the original artifact.
+          const recordPointer = `/results/${pageIndex}/${engine}/failures/${failureIndex}`;
 
           const observation = {
             id: failure.a11yOccurrenceFingerprint || `obs-os-${scanId}-${recordIndex}`,
@@ -51,7 +57,8 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
               format: 'report.json',
               scanId,
               importedAt,
-              originalRef: importedRef
+              originalRef: importedRef,
+              recordPointer
             },
             page: { ...page },
             classification: {

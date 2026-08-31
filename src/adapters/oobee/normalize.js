@@ -34,6 +34,13 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
     const wcag = parseWcagTags(row.wcagConformance);
     const wcagLevel = wcagLevelFromTags(row.wcagConformance);
 
+    // Oobee's CSV has no upstream unique finding id, but a finding is pinned by
+    // (issueId, url, xpath). Compose a stable, Workbench-derived identifier so a
+    // normalized record maps deterministically back to its source row.
+    const derivedFindingId = [row.issueId, row.url, row.xpath]
+      .map(v => (v || '').trim())
+      .join('|');
+
     const observation = {
       id: `obs-oobee-${i + 1}`,
       schemaVersion: '1.0',
@@ -43,7 +50,9 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
         format: 'report.csv',
         scanId: row.customFlowLabel || 'oobee-scan',
         importedAt,
-        originalRef: importedRef
+        originalRef: importedRef,
+        // CSV row index (0-based data rows, excluding the header).
+        recordPointer: `row:${i}`
       },
       page: {
         submittedUrl: row.url || '',
@@ -74,7 +83,11 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
         helpUrl: row.learnMore || null
       },
       identity: {
-        sourceFindingId: null,
+        // Oobee provides no upstream ids; this is a Workbench-derived composite
+        // (issueId|url|xpath) that stably pins the source row. Marked so it is
+        // never mistaken for an upstream identifier.
+        sourceFindingId: derivedFindingId,
+        sourceFindingIdSource: 'workbench-derived',
         sourcePatternId: null,
         sourceOccurrenceId: null,
         sourceFingerprint: null
