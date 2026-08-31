@@ -1,61 +1,85 @@
 /**
- * ARRM (Accessibility Roles and Responsibilities Mapping) module.
+ * ARRM (Accessibility Roles and Responsibilities Mapping) role router.
+ *
+ * The success-criterion → role mapping is a faithful parse of the W3C ARRM
+ * matrix (w3c/wai-arrm, draft, CC-BY-4.0), generated into
+ * `arrm-wcag-map.generated.js` by `scripts/build-arrm-data.js`. This module does
+ * not hand-author mappings and does not present Workbench inferences as W3C
+ * ARRM: when a success criterion is not covered by ARRM, the result is labelled
+ * with an honest `source` other than `w3c-arrm`.
  */
 
-export const ARRM_ROLES = {
-  CONTENT: { id: 'content', name: 'Content Authoring', key: 'content' },
-  VISUAL_DESIGN: { id: 'visual-design', name: 'Visual Design', key: 'visual-design' },
-  UX_DESIGN: { id: 'ux-design', name: 'UX / Interaction Design', key: 'ux-design' },
-  FRONTEND_DEV: { id: 'frontend-dev', name: 'Front-End Development', key: 'frontend-dev' },
-  BACKEND_DEV: { id: 'backend-dev', name: 'Back-End Development', key: 'backend-dev' },
-  QA_TESTING: { id: 'qa-testing', name: 'Automated & Manual Testing', key: 'qa-testing' },
-  PRODUCT: { id: 'product-governance', name: 'Product & Governance', key: 'product-governance' }
-};
+import { ARRM_WCAG_MAP, ARRM_ROLES_BY_ID, ARRM_METADATA } from './arrm-wcag-map.generated.js';
 
-const WCAG_ROLE_TABLE = {
-  '1.1.1': { primary: 'Content Authoring', secondary: ['Front-End Development', 'Visual Design'], contributors: ['Automated & Manual Testing'] },
-  '1.3.1': { primary: 'Front-End Development', secondary: ['UX / Interaction Design', 'Content Authoring'], contributors: ['Automated & Manual Testing'] },
-  '1.4.3': { primary: 'Visual Design', secondary: ['Front-End Development'], contributors: ['Automated & Manual Testing'] },
-  '1.4.10': { primary: 'Front-End Development', secondary: ['Visual Design', 'UX / Interaction Design'], contributors: ['Automated & Manual Testing'] },
-  '1.4.11': { primary: 'Visual Design', secondary: ['Front-End Development'], contributors: ['Automated & Manual Testing'] },
-  '2.4.4': { primary: 'Content Authoring', secondary: ['Front-End Development'], contributors: ['UX / Interaction Design', 'Automated & Manual Testing'] },
-  '2.4.6': { primary: 'Content Authoring', secondary: ['UX / Interaction Design', 'Front-End Development'], contributors: ['Automated & Manual Testing'] },
-  '2.4.7': { primary: 'Visual Design', secondary: ['Front-End Development'], contributors: ['Automated & Manual Testing'] },
-  '2.4.11': { primary: 'Front-End Development', secondary: ['Visual Design'], contributors: ['Automated & Manual Testing'], source: 'Workbench WCAG 2.2 Extension' },
-  '2.5.8': { primary: 'Visual Design', secondary: ['Front-End Development', 'UX / Interaction Design'], contributors: ['Automated & Manual Testing'], source: 'Workbench WCAG 2.2 Extension' },
-  '3.1.1': { primary: 'Content Authoring', secondary: ['Front-End Development'], contributors: ['Automated & Manual Testing'] },
-  '3.3.2': { primary: 'Content Authoring', secondary: ['UX / Interaction Design', 'Front-End Development'], contributors: ['Automated & Manual Testing'] },
-  '4.1.2': { primary: 'Front-End Development', secondary: ['UX / Interaction Design'], contributors: ['Automated & Manual Testing'] }
-};
+export { ARRM_METADATA };
 
+/** Canonical ARRM role identities (plus the Workbench Testing/QA extension). */
+export const ARRM_ROLES = Object.fromEntries(
+  Object.entries(ARRM_ROLES_BY_ID).map(([id, r]) => [
+    id.toUpperCase().replace(/-/g, '_'),
+    { id, name: r.name, arrm: r.arrm }
+  ])
+);
+
+function roleName(id) {
+  return ARRM_ROLES_BY_ID[id]?.name || id;
+}
+
+function toNames(ids = []) {
+  return ids.map(roleName);
+}
+
+/**
+ * Resolves the likely roles for a finding from its WCAG success criteria.
+ *
+ * @param {string[]} wcagCriteriaList - dotted success criteria, e.g. ["2.4.4"].
+ * @param {string} [ruleId] - normalized rule id, used only for the honest
+ *   fallback when no success criterion is covered by ARRM.
+ * @returns {{
+ *   primary: string|null,
+ *   coPrimary: string[],
+ *   secondary: string[],
+ *   contributors: string[],
+ *   source: 'w3c-arrm' | 'workbench-inference',
+ *   matchedSc: string|null,
+ *   wcagLevel: string|null
+ * }}
+ */
 export function getRolesForWcag(wcagCriteriaList = [], ruleId = '') {
   let matched = null;
+  let matchedSc = null;
 
   for (const sc of wcagCriteriaList) {
-    if (WCAG_ROLE_TABLE[sc]) {
-      matched = WCAG_ROLE_TABLE[sc];
+    if (ARRM_WCAG_MAP[sc]) {
+      matched = ARRM_WCAG_MAP[sc];
+      matchedSc = sc;
       break;
     }
   }
 
-  if (!matched) {
-    if (ruleId.includes('contrast')) {
-      matched = WCAG_ROLE_TABLE['1.4.3'];
-    } else if (ruleId.includes('alt') || ruleId.includes('link-name')) {
-      matched = WCAG_ROLE_TABLE['2.4.4'];
-    } else {
-      matched = {
-        primary: 'Front-End Development',
-        secondary: ['UX / Interaction Design'],
-        contributors: ['Automated & Manual Testing']
-      };
-    }
+  if (matched) {
+    return {
+      primary: matched.primary ? roleName(matched.primary) : null,
+      coPrimary: toNames(matched.coPrimary),
+      secondary: toNames(matched.secondary),
+      contributors: toNames(matched.contributors),
+      source: 'w3c-arrm',
+      matchedSc,
+      wcagLevel: matched.wcagLevel || null
+    };
   }
 
+  // No ARRM coverage for this finding's success criteria. Provide a clearly
+  // labelled Workbench inference — never presented as W3C ARRM. Kept minimal
+  // and honest: front-end development is the safe default owner for a technical
+  // finding, with testing as a contributor.
   return {
-    primary: matched.primary,
-    secondary: matched.secondary || [],
-    contributors: matched.contributors || ['Automated & Manual Testing'],
-    source: matched.source || 'W3C ARRM'
+    primary: roleName('frontend-dev'),
+    coPrimary: [],
+    secondary: [],
+    contributors: [roleName('qa-testing')],
+    source: 'workbench-inference',
+    matchedSc: null,
+    wcagLevel: null
   };
 }

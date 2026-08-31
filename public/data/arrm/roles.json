@@ -1,66 +1,69 @@
 [
   {
+    "id": "business",
+    "name": "Business",
+    "arrm": true,
+    "description": "Sets product requirements, policy, and priorities that shape accessibility outcomes.",
+    "canChange": [
+      "Product/business requirements",
+      "Governance/process"
+    ],
+    "source": "w3c-arrm"
+  },
+  {
     "id": "content",
     "name": "Content Authoring",
+    "arrm": true,
     "description": "Creates text, alt text, headings, captions, link meaning, page language, and media alternatives.",
     "canChange": [
       "Page content and media",
-      "Content structure"
-    ]
+      "Content structure",
+      "CMS configuration"
+    ],
+    "source": "w3c-arrm"
   },
   {
     "id": "visual-design",
     "name": "Visual Design",
+    "arrm": true,
     "description": "Defines color contrast, typography scale, visual layout, focus indicator styling, and iconography.",
     "canChange": [
       "CSS/design tokens",
       "Visual design"
-    ]
+    ],
+    "source": "w3c-arrm"
   },
   {
     "id": "ux-design",
-    "name": "UX / Interaction Design",
+    "name": "User Experience (UX) Design",
+    "arrm": true,
     "description": "Designs keyboard workflows, landmark layout, form error flows, focus order, and interactive patterns.",
     "canChange": [
-      "UX/interaction design",
-      "Product/business requirements"
-    ]
+      "UX/interaction design"
+    ],
+    "source": "w3c-arrm"
   },
   {
     "id": "frontend-dev",
     "name": "Front-End Development",
+    "arrm": true,
     "description": "Implements semantic HTML, ARIA, CSS layout, DOM hierarchy, keyboard event handling, and focus management.",
     "canChange": [
       "HTML/templates/components",
       "CSS/design tokens",
       "JavaScript/interactions",
       "Design systems/components"
-    ]
-  },
-  {
-    "id": "backend-dev",
-    "name": "Back-End Development",
-    "description": "Implements server-side templates, CMS field formatters, database-driven markup, and API responses.",
-    "canChange": [
-      "HTML/templates/components",
-      "CMS configuration"
-    ]
+    ],
+    "source": "w3c-arrm"
   },
   {
     "id": "qa-testing",
-    "name": "Automated & Manual Testing",
-    "description": "Conducts assistive technology audits, regression testing, automated test suite maintenance, and verification.",
+    "name": "Testing / QA",
+    "arrm": false,
+    "source": "open-accessibility-workbench-extension",
+    "description": "Verifies fixes via automated re-scan and manual/assistive-technology testing.",
     "canChange": [
       "Automated/manual testing"
-    ]
-  },
-  {
-    "id": "product-governance",
-    "name": "Product & Governance",
-    "description": "Prioritizes remediation tasks, allocates engineering capacity, ensures compliance, and manages vendor standards.",
-    "canChange": [
-      "Product/business requirements",
-      "Governance/process"
     ]
   }
 ]

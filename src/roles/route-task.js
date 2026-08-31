@@ -35,7 +35,7 @@ export function isTaskRelevantToProfile(task, userCapabilities = []) {
     }
   }
 
-  // Front-End & Back-End Dev Match
+  // Development Match (ARRM: Front-End Development)
   if (primaryRole.includes('Development') || secondaryRoles.some(r => r.includes('Development'))) {
     if (
       userCapabilities.includes('HTML/templates/components') ||

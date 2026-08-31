@@ -1,9 +1,13 @@
 {
   "source": "W3C ARRM (Accessibility Roles and Responsibilities Mapping)",
+  "sourceRepository": "https://github.com/w3c/wai-arrm",
+  "sourceFile": "_data/arrm/arrm-wcag-sc.csv",
+  "sourceBranch": "draft",
   "sourceUrl": "https://www.w3.org/WAI/planning/arrm/",
-  "snapshotDate": "2026-08-29",
-  "arrmStatus": "W3C Community Group Guidance / Resource",
-  "license": "W3C Document License / CC-BY-4.0",
-  "attribution": "W3C Web Accessibility Initiative (WAI) ARRM Community Group & Open Accessibility Workbench contributors",
-  "extensionNote": "WCAG 2.2 extensions added by Open Accessibility Workbench are tagged with source: open-accessibility-workbench-extension"
+  "snapshotDate": "2026-08-30",
+  "arrmStatus": "In-progress draft — W3C ARRM Community Group",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "W3C Accessibility Roles and Responsibilities Mapping (ARRM) Community Group",
+  "note": "Role assignments below are a faithful parse of the ARRM matrix. The Workbench adds a Testing/QA role for capability routing; it is NOT part of W3C ARRM and is tagged source: \"open-accessibility-workbench-extension\"."
 }
