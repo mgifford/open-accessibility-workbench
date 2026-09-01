@@ -17,8 +17,11 @@
  *   must not delete their caches.
  */
 
-const CACHE_VERSION = 'v3';
-const CACHE_NAME = `oaw-shell-${CACHE_VERSION}`;
+// The cache name is build-unique (a build id is injected at build time) so each
+// deploy installs a fresh precache and activate purges the previous build's —
+// a static name would serve a stale shell cache-first across deploys.
+const BUILD_ID = self.__BUILD_ID__ || 'dev';
+const CACHE_NAME = `oaw-shell-${BUILD_ID}`;
 const CACHE_PREFIX = 'oaw-';
 
 // Injected at build time; falls back to an empty list in dev (where the shell is
@@ -76,23 +79,33 @@ self.addEventListener('fetch', (event) => {
   // Vary-aware match would miss it, wrongly falling through to the network.
   const matchOpts = { ignoreVary: true };
 
+  const cachedShell = async () =>
+    (await caches.match(SCOPE_PATH, matchOpts)) ||
+    (await caches.match(SCOPE_PATH + 'index.html', matchOpts)) ||
+    (await caches.match('./index.html', matchOpts));
+
+  // Navigations are NETWORK-FIRST: always try the network so a new deploy's
+  // index.html (which references the new hashed assets) is picked up promptly,
+  // falling back to the cached shell only when offline. Hashed assets are
+  // immutable, so they stay CACHE-FIRST below.
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetchAndCache(req).catch(async () =>
+        (await cachedShell()) || new Response('Offline and not cached.', { status: 503, statusText: 'Offline' })
+      )
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(req, matchOpts).then((cached) => {
       if (cached) {
         fetchAndCache(req).catch(() => {}); // refresh in the background when online
         return cached;
       }
-      return fetchAndCache(req).catch(async () => {
-        // Offline and uncached: for a navigation, serve the cached shell so the
-        // hash-routed SPA can boot offline.
-        if (req.mode === 'navigate') {
-          return (await caches.match(SCOPE_PATH, matchOpts)) ||
-            (await caches.match(SCOPE_PATH + 'index.html', matchOpts)) ||
-            (await caches.match('./index.html', matchOpts)) ||
-            new Response('Offline and not cached.', { status: 503, statusText: 'Offline' });
-        }
-        return new Response('Offline and not cached.', { status: 503, statusText: 'Offline' });
-      });
+      return fetchAndCache(req).catch(async () =>
+        new Response('Offline and not cached.', { status: 503, statusText: 'Offline' })
+      );
     })
   );
 });
