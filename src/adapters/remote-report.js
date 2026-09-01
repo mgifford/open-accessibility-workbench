@@ -65,6 +65,18 @@ export async function fetchRemoteReport(rawUrl, opts = {}) {
     if (!res.ok) {
       return { ok: false, error: `The report host responded with ${res.status}. Download the report and upload it here instead.` };
     }
+    // Redirect trust check (spec §13.5): trust was validated against the URL the
+    // user gave, but redirect:'follow' can land on a different origin. If the
+    // response was redirected to a host that is not itself trusted (and the user
+    // did not confirm arbitrary origins), refuse before reading the body — a
+    // trusted URL must not become a back door to an arbitrary origin.
+    if (res.redirected && res.url) {
+      const finalCls = classifyReportUrl(res.url);
+      if (!finalCls.ok) return { ok: false, error: 'The report redirected to an unsupported URL.' };
+      if (!finalCls.trusted && !opts.confirmedArbitrary) {
+        return { ok: false, needsConfirmation: true, error: `This report redirected to ${finalCls.url.hostname}, which is not a documented trusted host. Confirm you want to fetch it, or download it and upload it here instead.` };
+      }
+    }
     // Refuse before consuming the body when the server declares an over-limit
     // size (spec §13.3). Not all servers send Content-Length; the string-size
     // backstop in the loader still applies after consumption.

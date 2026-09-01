@@ -177,6 +177,31 @@ describe('Phase 13: secure remote report loading (§13.5)', () => {
     assert.match(r.error, /CORS|download the report and upload/i);
   });
 
+  test('a redirect from a trusted URL to an arbitrary origin needs confirmation', async () => {
+    let consumed = false;
+    const r = await fetchRemoteReport(`https://${TRUSTED_REPORT_HOSTS[0]}/r.json`, {
+      fetchImpl: async () => ({
+        ok: true, status: 200, redirected: true, url: 'https://evil.example/r.json',
+        headers: { get: () => null },
+        text: async () => { consumed = true; return '{}'; }
+      })
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.needsConfirmation, true);
+    assert.match(r.error, /redirected to evil\.example/i);
+    assert.equal(consumed, false, 'must not read the body after an untrusted redirect');
+  });
+
+  test('a redirect that stays on a trusted host is allowed', async () => {
+    const r = await fetchRemoteReport(`https://${TRUSTED_REPORT_HOSTS[0]}/a.json`, {
+      fetchImpl: async () => ({
+        ok: true, status: 200, redirected: true, url: `https://${TRUSTED_REPORT_HOSTS[0]}/b.json`,
+        headers: { get: () => null }, text: async () => '{}'
+      })
+    });
+    assert.equal(r.ok, true);
+  });
+
   test('an over-limit Content-Length is refused before the body is consumed', async () => {
     let consumed = false;
     const r = await fetchRemoteReport('https://example.test/big.json', {
