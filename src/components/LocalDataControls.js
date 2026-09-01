@@ -1,5 +1,10 @@
-import { clearLocalData, listStoredData, LOCAL_DATA_ITEMS } from '../state/local-data.js';
+import { clearLocalData, listStoredData } from '../state/local-data.js';
 import { escapeHtml } from '../utils/escape-html.js';
+import { workspaceStore } from '../state/workspace.js';
+import { profileStore } from '../state/profile.js';
+import { technologyStore } from '../state/technology.js';
+import { taskStatusStore } from '../state/task-status.js';
+import { aiConsentStore } from '../state/ai-consent.js';
 
 /**
  * "Clear local data" control (spec §13.2). Lists exactly what preferences are
@@ -21,7 +26,7 @@ export class LocalDataControls extends HTMLElement {
           ${(stored.length ? stored : []).map(i => `<li>${escapeHtml(i.label)}</li>`).join('') || '<li>Nothing is stored right now.</li>'}
         </ul>
         <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin: var(--space-2) 0;">
-          "Clear local data" removes all of the above (capability profile, task statuses, technology preferences, and the AI consent preference). It does not affect any downloaded AI model — remove that from the AI advisor panel.
+          "Clear local data" removes all of the above (capability profile, task statuses, technology preferences, and the AI consent preference) and also resets the active workspace in memory (the loaded report and its derived tasks). This build downloads no separate AI model.
         </p>
         <button type="button" class="btn btn-secondary" id="clear-local-data">Clear local data</button>
         <span id="clear-local-status" role="status" aria-live="polite" style="margin-left: var(--space-2); font-size: var(--font-size-xs);"></span>
@@ -30,10 +35,23 @@ export class LocalDataControls extends HTMLElement {
     const btn = this.querySelector('#clear-local-data');
     if (btn) {
       btn.addEventListener('click', () => {
+        // Reset the live in-memory stores to defaults FIRST (some persist on
+        // change), THEN clear storage so no key is re-persisted afterwards.
+        workspaceStore.reset();
+        profileStore.setCapabilities([]);
+        technologyStore.reset();          // clears confirmed
+        technologyStore.state.rejected = []; // and clear rejections in memory
+        taskStatusStore.clear();
+        aiConsentStore.disable();
         const { removed } = clearLocalData();
-        const status = this.querySelector('#clear-local-status');
-        if (status) status.textContent = removed > 0 ? `Cleared ${removed} stored item(s).` : 'Nothing was stored.';
+
+        // Re-render the list first, THEN set the status message, so the message
+        // is not wiped by the re-render.
         this.render();
+        const status = this.querySelector('#clear-local-status');
+        if (status) status.textContent = removed > 0
+          ? `Cleared ${removed} stored item(s) and reset the workspace.`
+          : 'Reset the workspace. Nothing was stored.';
       });
     }
   }
