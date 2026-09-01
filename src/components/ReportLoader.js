@@ -14,6 +14,7 @@ import { technologyStore } from '../state/technology.js';
 import { checkFileSize } from '../utils/input-limits.js';
 import { fetchRemoteReport, reportUrlFromLocation, reportJsonSiblingUrl } from '../adapters/remote-report.js';
 import { workspaceStore } from '../state/workspace.js';
+import { parseInWorker, cancelParse, isWorkerSupported } from '../workers/parse-client.js';
 
 export class ReportLoader extends HTMLElement {
   connectedCallback() {
@@ -243,7 +244,6 @@ export class ReportLoader extends HTMLElement {
   }
 
   processFileContent(content, filename, overlapContent = null, opts = {}) {
-    const note = opts.note ? `${opts.note} ` : '';
     const errorBox = this.querySelector('#error-container');
     errorBox.style.display = 'none';
 
@@ -262,6 +262,44 @@ export class ReportLoader extends HTMLElement {
       return;
     }
 
+    // Offload the CPU-heavy finding-level parse/reduce to a worker so the main
+    // thread stays responsive and the run is cancellable (spec §13.1/§13.7). The
+    // worker decides whether the format is offloadable; summary/aggregate formats
+    // and environments without Worker fall back to the synchronous path.
+    if (isWorkerSupported()) {
+      this.processViaWorker(content, filename, overlapContent, opts);
+    } else {
+      this.processSynchronously(content, filename, overlapContent, opts);
+    }
+  }
+
+  async processViaWorker(content, filename, overlapContent, opts) {
+    this.showProgress('Analyzing report…');
+    try {
+      const result = await parseInWorker(content, filename, (p) => this.showProgress(p.detail || 'Analyzing…'));
+      if (!result.offloadable) {
+        // Summary/aggregate/other: cheap, handle synchronously.
+        this.hideProgress();
+        this.processSynchronously(content, filename, overlapContent, opts);
+        return;
+      }
+      this.finishFindingLevel({
+        content, filename, overlapContent, opts,
+        system: result.system, format: result.format,
+        observations: result.observations, clusters: result.clusters, hypotheses: result.hypotheses,
+        totalPages: result.totalPages, rawTotals: result.rawTotals, engines: result.engines,
+        scanId: result.scanId, scanTitle: result.scanTitle, issueNumber: result.issueNumber,
+        scanMetadata: result.scanMetadata
+      });
+    } catch (err) {
+      this.hideProgress();
+      if (err && err.name === 'AbortError') { this.showError('Analysis cancelled.'); return; }
+      this.showError('Failed to process report: ' + err.message);
+    }
+  }
+
+  processSynchronously(content, filename, overlapContent = null, opts = {}) {
+    const note = opts.note ? `${opts.note} ` : '';
     try {
       const detection = detectReportSource(content, filename);
       if (!detection.recognized) {
@@ -305,39 +343,56 @@ export class ReportLoader extends HTMLElement {
         return;
       }
 
-      let observations = [];
-      let totalPages = 1;
-      let rawTotals = null;
-      let engines = [];
-      let pageSummaries = null;
-      let sourceSummary = { system: detection.system, format: detection.format, filename };
-
       if (detection.type === REPORT_TYPES.OPEN_SCANS_JSON) {
         const parsed = parseOpenScansReportJson(detection.parsedData || content, filename);
-        observations = parsed.observations;
-        totalPages = parsed.totalPages;
-        rawTotals = parsed.rawTotals;
-        engines = parsed.engines;
-        sourceSummary = {
-          ...sourceSummary, scanId: parsed.scanId, scanTitle: parsed.scanTitle,
-          issueNumber: parsed.issueNumber, totalPages, engines
-        };
+        const enriched = enrichObservationsWithSignatures(parsed.observations);
+        const clusters = clusterPatternOccurrences(enriched, parsed.totalPages);
+        const hypotheses = buildComponentHypotheses(clusters, parsed.totalPages);
+        this.finishFindingLevel({
+          content, filename, overlapContent, opts,
+          system: detection.system, format: detection.format,
+          observations: enriched, clusters, hypotheses,
+          totalPages: parsed.totalPages, rawTotals: parsed.rawTotals, engines: parsed.engines,
+          scanId: parsed.scanId, scanTitle: parsed.scanTitle, issueNumber: parsed.issueNumber,
+          scanMetadata: detection.parsedData?.technologies ? { technologies: detection.parsedData.technologies } : null
+        });
+      } else if (detection.type === REPORT_TYPES.OOBEE_CSV) {
+        const parsed = parseOobeeReportCsv(detection.parsedData || content, filename);
+        const enriched = enrichObservationsWithSignatures(parsed.observations);
+        const clusters = clusterPatternOccurrences(enriched, parsed.totalPages);
+        const hypotheses = buildComponentHypotheses(clusters, parsed.totalPages);
+        this.finishFindingLevel({
+          content, filename, overlapContent, opts,
+          system: detection.system, format: detection.format,
+          observations: enriched, clusters, hypotheses,
+          totalPages: parsed.totalPages, rawTotals: null, engines: [],
+          scanId: 'oobee-csv', scanTitle: null, issueNumber: null, scanMetadata: null
+        });
       } else if (detection.type === REPORT_TYPES.OPEN_SCANS_CSV) {
         // Page-level summary CSV: no finding-level evidence, but real per-page
         // and per-engine failure counts the overview can display truthfully.
         const parsed = parseOpenScansReportCsv(detection.parsedData || content);
-        totalPages = parsed.totalPages;
-        pageSummaries = parsed.pages;
-        rawTotals = summarizeCsvTotals(parsed.pages);
-        sourceSummary = {
-          ...sourceSummary, scanId: String(parsed.pages[0]?.issueNumber || 'open-scans-csv'),
-          scanTitle: parsed.pages[0]?.scanTitle || '', totalPages, granularity: 'page'
-        };
-      } else if (detection.type === REPORT_TYPES.OOBEE_CSV) {
-        const parsed = parseOobeeReportCsv(detection.parsedData || content, filename);
-        observations = parsed.observations;
-        totalPages = parsed.totalPages;
-        sourceSummary = { ...sourceSummary, scanId: 'oobee-csv', totalPages };
+        const sourceReport = makeSourceReport({
+          filename, system: detection.system, format: detection.format,
+          scanId: String(parsed.pages[0]?.issueNumber || 'open-scans-csv'),
+          rawContent: typeof content === 'string' ? content : JSON.stringify(content)
+        });
+        const existingReports = workspaceStore.state.sourceReports || [];
+        const sourceReports = existingReports.some(r => r.id === sourceReport.id) ? existingReports : [...existingReports, sourceReport];
+        workspaceStore.setState({
+          loaded: true,
+          sourceSummary: {
+            system: detection.system, format: detection.format, filename,
+            scanId: sourceReport.scanId, scanTitle: parsed.pages[0]?.scanTitle || '',
+            totalPages: parsed.totalPages, granularity: 'page',
+            rawTotals: summarizeCsvTotals(parsed.pages), pageSummaries: parsed.pages,
+            sourceReportId: sourceReport.id
+          },
+          sourceReports, observations: [], clusters: [], hypotheses: [], tasks: [],
+          overlapData: null, summaryData: null, importNote: opts.note || null,
+          statusMessage: `${note}Summary CSV loaded (${parsed.totalPages} pages).`
+        });
+        window.location.hash = '#/overview';
       } else {
         this.showError(
           `The "${detection.type}" format is recognized but not yet supported for full ingestion in this view.\n\n` +
@@ -345,76 +400,104 @@ export class ReportLoader extends HTMLElement {
         );
         return;
       }
-
-      // Register a durable source-report identity and stamp every observation
-      // with its sourceReportId, so provenance can be RESOLVED (not just
-      // asserted) and two same-named reports stay distinguishable.
-      const sourceReport = makeSourceReport({
-        filename,
-        system: detection.system,
-        format: detection.format,
-        scanId: sourceSummary.scanId ?? null,
-        rawContent: typeof content === 'string' ? content : JSON.stringify(content)
-      });
-      for (const obs of observations) {
-        if (obs.source) obs.source.sourceReportId = sourceReport.id;
-      }
-
-      // Attach cross-scanner overlap statistics when available.
-      let overlapData = null;
-      if (overlapContent) {
-        try {
-          overlapData = parseOpenScansOverlapJson(overlapContent);
-        } catch { /* overlap is optional; ignore a malformed sibling */ }
-      }
-
-      const enriched = enrichObservationsWithSignatures(observations);
-      const clusters = clusterPatternOccurrences(enriched, totalPages);
-      const hypotheses = buildComponentHypotheses(clusters, totalPages);
-      // Pass the source-report id as the workspace id so task ids are stable and
-      // report-scoped (status never leaks between reports).
-      // Technology context: honour the user's confirmation/rejection and any
-      // forward-compatible technologies[] the report carries.
-      const techState = technologyStore.state;
-      const scanMetadata = detection.parsedData?.technologies ? { technologies: detection.parsedData.technologies } : null;
-      const tasks = buildRemediationTasks(
-        clusters, hypotheses, totalPages,
-        techState.confirmed || null,
-        scanMetadata,
-        sourceReport.id,
-        techState.rejected || []
-      );
-
-      // Merge into the workspace's source-report registry (supports multiple
-      // imported reports over a session).
-      const existingReports = workspaceStore.state.sourceReports || [];
-      const sourceReports = existingReports.some(r => r.id === sourceReport.id)
-        ? existingReports
-        : [...existingReports, sourceReport];
-
-      workspaceStore.setState({
-        loaded: true,
-        sourceSummary: { ...sourceSummary, rawTotals, pageSummaries, sourceReportId: sourceReport.id },
-        sourceReports,
-        observations: enriched,
-        clusters,
-        hypotheses,
-        scanMetadata, // retained so technology changes can recompute tasks
-        tasks,
-        overlapData,
-        summaryData: null,
-        importNote: opts.note || null,
-        statusMessage: `${note}Report loaded. ${observations.length} observations analyzed into ${tasks.length} remediation tasks.`
-      });
-
-      // Navigate to overview
-      window.location.hash = '#/overview';
     } catch (err) {
       this.showError('Failed to process report: ' + err.message);
     }
   }
 
+  /**
+   * Shared tail for finding-level reports (worker or synchronous): assigns the
+   * durable source-report identity, stamps observations, pairs any overlap
+   * sibling, builds technology-aware tasks, and commits workspace state.
+   */
+  finishFindingLevel(a) {
+    const { content, filename, overlapContent, opts = {} } = a;
+    const note = opts.note ? `${opts.note} ` : '';
+    this.hideProgress();
+
+    const sourceReport = makeSourceReport({
+      filename, system: a.system, format: a.format,
+      scanId: a.scanId ?? null,
+      rawContent: typeof content === 'string' ? content : JSON.stringify(content)
+    });
+    for (const obs of a.observations) {
+      if (obs.source) obs.source.sourceReportId = sourceReport.id;
+    }
+
+    let overlapData = null;
+    if (overlapContent) {
+      try { overlapData = parseOpenScansOverlapJson(overlapContent); }
+      catch { /* overlap is optional; ignore a malformed sibling */ }
+    }
+
+    const techState = technologyStore.state;
+    const tasks = buildRemediationTasks(
+      a.clusters, a.hypotheses, a.totalPages,
+      techState.confirmed || null,
+      a.scanMetadata,
+      sourceReport.id,
+      techState.rejected || []
+    );
+
+    const existingReports = workspaceStore.state.sourceReports || [];
+    const sourceReports = existingReports.some(r => r.id === sourceReport.id)
+      ? existingReports
+      : [...existingReports, sourceReport];
+
+    workspaceStore.setState({
+      loaded: true,
+      sourceSummary: {
+        system: a.system, format: a.format, filename,
+        scanId: a.scanId, scanTitle: a.scanTitle, issueNumber: a.issueNumber,
+        totalPages: a.totalPages, engines: a.engines || [],
+        rawTotals: a.rawTotals, pageSummaries: null, sourceReportId: sourceReport.id
+      },
+      sourceReports,
+      observations: a.observations,
+      clusters: a.clusters,
+      hypotheses: a.hypotheses,
+      scanMetadata: a.scanMetadata,
+      tasks,
+      overlapData,
+      summaryData: null,
+      importNote: opts.note || null,
+      statusMessage: `${note}Report loaded. ${a.observations.length} observations analyzed into ${tasks.length} remediation tasks.`
+    });
+    window.location.hash = '#/overview';
+  }
+
+  /** Shows a live progress message with a Cancel button (spec §13.7). */
+  showProgress(detail) {
+    let box = this.querySelector('#progress-container');
+    if (!box) {
+      // Build the box (and its persistent Cancel button) ONCE; later progress
+      // updates only change the detail text so the button is never detached
+      // mid-click (spec §13.7 cancellation must be reliably clickable).
+      box = document.createElement('div');
+      box.id = 'progress-container';
+      box.setAttribute('role', 'status');
+      box.setAttribute('aria-live', 'polite');
+      box.style.cssText = 'display:flex; gap:var(--space-4); align-items:center; justify-content:space-between; flex-wrap:wrap; background:var(--color-brand-bg); color:var(--color-text-primary); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:var(--space-3) var(--space-4); margin-top:var(--space-4);';
+      box.innerHTML = `
+        <span id="progress-detail"></span>
+        <button type="button" class="btn btn-secondary" id="cancel-parse-btn">Cancel</button>`;
+      box.querySelector('#cancel-parse-btn')
+        .addEventListener('click', () => { cancelParse(); this.hideProgress(); });
+      const errorBox = this.querySelector('#error-container');
+      if (errorBox && errorBox.parentNode) errorBox.parentNode.insertBefore(box, errorBox.nextSibling);
+      else this.appendChild(box);
+    }
+    box.querySelector('#progress-detail').textContent = detail;
+    box.style.display = 'flex';
+  }
+
+  hideProgress() {
+    const box = this.querySelector('#progress-container');
+    if (box) box.style.display = 'none';
+  }
+
   showError(msg) {
+    this.hideProgress();
     const errorBox = this.querySelector('#error-container');
     errorBox.textContent = msg;
     errorBox.style.display = 'block';
