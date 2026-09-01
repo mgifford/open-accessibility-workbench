@@ -15,6 +15,7 @@
   --color-brand-primary: #1d4ed8;
   --color-brand-primary-hover: #1e40af;
   --color-brand-bg: #eff6ff;
+  --color-text-on-brand: #ffffff; /* 6.7:1 on brand-primary (light) */
 
   --color-urgency-critical: #b91c1c;
   --color-urgency-critical-bg: #fef2f2;
@@ -73,9 +74,10 @@
     --color-border: #334155;
     --color-border-strong: #64748b;
 
-    --color-brand-primary: #3b82f6;
-    --color-brand-primary-hover: #60a5fa;
+    --color-brand-primary: #60a5fa; /* 5.8:1 on brand-bg (dark) for link text */
+    --color-brand-primary-hover: #93c5fd;
     --color-brand-bg: #172554;
+    --color-text-on-brand: #0f172a; /* 7.0:1 on brand-primary (dark) for buttons */
 
     --color-urgency-critical: #ef4444;
     --color-urgency-critical-bg: #450a0a;

@@ -28,7 +28,7 @@ body {
   top: -999px;
   left: 1rem;
   background: var(--color-brand-primary);
-  color: #ffffff;
+  color: var(--color-text-on-brand);
   padding: var(--space-2) var(--space-4);
   z-index: 1000;
   text-decoration: none;
@@ -152,7 +152,7 @@ main.app-main {
 
 .btn-primary {
   background-color: var(--color-brand-primary);
-  color: #ffffff;
+  color: var(--color-text-on-brand);
 }
 
 .btn-primary:hover {
