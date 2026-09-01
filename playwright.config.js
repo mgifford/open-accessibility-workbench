@@ -16,7 +16,12 @@ export default defineConfig({
     trace: 'on-first-retry'
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } }
+    // Core report import + deterministic remediation MUST work on all three,
+    // without WebGPU. The AI-consent spec is chromium-only (WebGPU capability
+    // path); it never blocks the core workflow.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] }, testIgnore: /ai-consent\.spec\.js/ },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testIgnore: /ai-consent\.spec\.js/ }
   ],
   // Build once, then serve the built app for tests (matches what deploys).
   webServer: {

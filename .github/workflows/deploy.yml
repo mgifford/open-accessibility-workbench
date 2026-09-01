@@ -27,6 +27,12 @@ jobs:
       - run: npm ci
       # Provenance-verify the bundled data, then run unit tests as a gate.
       - run: npm test
+      # Browser regression + accessibility + offline gate (spec §13/§14). These
+      # run against the production build (vite preview) via playwright.config.js.
+      # Chromium + Firefox cover the core workflow, offline relaunch, and the
+      # worker pipeline; the WebKit-offline caveat is documented and skipped.
+      - run: npx playwright install --with-deps chromium firefox
+      - run: npm run test:browser -- --project=chromium --project=firefox
       # Build with the correct base path for a project Pages site
       # (served from /<repo>/), producing dist/.
       - run: npm run build -- --base=/open-accessibility-workbench/
