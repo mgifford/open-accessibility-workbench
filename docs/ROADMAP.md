@@ -60,26 +60,33 @@ _Last updated: 2026-09-01._
 
 ## Scaffolded 🟡
 
-**Optional local AI advisor (Phases 11–12)**
-- What exists: the consent gate, a Web-Worker generation path, prompt
-  construction, a strict untrusted-data-safe response processor, invention
-  checks (no fabricated names/alt/colours/filenames), and a bounded validation
-  loop — all present and unit-tested.
-- What is **not** in this build: a **real on-device model runtime**. There is no
-  model download; the advisor composes structured guidance deterministically. The
-  panel says so plainly, and the deterministic guidance on every task works with
-  AI on or off. See [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md) for the intended
-  design (which the "Planned" item below would realise).
+**Optional local AI advisor + on-device model runtime (Phases 11–12, 15)**
+- What exists and is **built**: the consent gate, prompt construction, a strict
+  untrusted-data-safe response processor, invention checks (no fabricated
+  names/alt/colours/filenames), a bounded validation loop, **and a real on-device
+  model runtime** (Phase 15) — transformers.js loading a small model with genuine
+  download progress, cancel, WebGPU/WASM inference, model-source choice
+  (Hugging Face or a GitHub release), disposal, and AI output presented as a
+  clearly-labelled **draft** behind the validation checks.
+- **Why still 🟡:** the runtime is **build-gated** (`VITE_AI_RUNTIME=1`) and OFF in
+  the default/deployed build, which tree-shakes the ~100 MB dependency out
+  entirely (the shipped build is honest that it downloads no model). It stays
+  scaffolded until real model load + inference are **verified on WebGPU-capable
+  hardware** and the model weights are hosted (see Planned). The wiring is
+  unit-tested with a mocked library; the download path was confirmed to start
+  against Hugging Face. Deterministic guidance on every task works with AI on or
+  off. See [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md).
 
 ---
 
 ## Planned ⬜
 
-- **Real on-device model runtime** — an actual small model (e.g. via
-  transformers.js/WebLLM) with genuine download, cancel, WebGPU/WASM execution,
-  local storage, and disposal. This carries a new third-party model-host
-  dependency and CSP changes and will land as its own scoped phase, not
-  incrementally.
+- **Verify + enable the AI model runtime** — the runtime is built (see Scaffolded)
+  but not enabled in the deployed build. Remaining: verify real model load +
+  inference on WebGPU hardware, publish the model weights as a GitHub release
+  asset for the non-Hugging-Face source, decide the deploy story for the ~100 MB
+  AI build (it must not bloat the default Pages deploy), then flip
+  `VITE_AI_RUNTIME=1` for an AI-enabled build.
 - **Formal manual accessibility audit** against the full WCAG 2.2 AA
   success-criteria set, and a **verified screen-reader pass** on real AT
   (NVDA/JAWS/VoiceOver/Orca/TalkBack). Prerequisites for any conformance claim —

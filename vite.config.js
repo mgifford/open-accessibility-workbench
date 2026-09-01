@@ -1,6 +1,32 @@
 import { defineConfig } from 'vite';
-import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+/**
+ * Self-hosts the transformers.js WASM backend so the ONNX runtime is served from
+ * our own origin (matching WASM_PATH in src/ai/model-runtime.js) rather than a
+ * third-party CDN. Only copies when the files exist (the AI dependency is
+ * optional); the AI model runtime is flag-gated regardless.
+ */
+function selfHostWasmPlugin() {
+  return {
+    name: 'oaw-selfhost-wasm',
+    apply: 'build',
+    closeBundle() {
+      // Only self-host WASM when the AI runtime is actually built in.
+      if (process.env.VITE_AI_RUNTIME !== '1') return;
+      const src = resolve(process.cwd(), 'node_modules/onnxruntime-web/dist');
+      if (!existsSync(src)) return;
+      const destDir = resolve(process.cwd(), 'dist/wasm');
+      mkdirSync(destDir, { recursive: true });
+      for (const f of readdirSync(src)) {
+        if (/\.(wasm|mjs)$/.test(f)) {
+          try { copyFileSync(resolve(src, f), resolve(destDir, f)); } catch { /* best-effort */ }
+        }
+      }
+    }
+  };
+}
 
 /**
  * Injects the fingerprinted app-shell asset list into the built service worker so
@@ -19,9 +45,11 @@ function precacheManifestPlugin() {
       const assetsDir = resolve(outDir, 'assets');
       const assets = existsSync(assetsDir)
         ? readdirSync(assetsDir)
-            // Precache JS/CSS the shell needs; skip source maps and the AI/parse
-            // worker chunks are pulled in on demand but caching them is harmless.
             .filter((f) => /\.(js|css)$/.test(f))
+            // Precache only the app shell. Exclude the large, on-demand AI chunks
+            // (transformers.js runtime and the AI worker) — they load lazily only
+            // when a user enables AI and must not bloat the offline shell.
+            .filter((f) => !/transformers|onnxruntime|ort-|ai-worker/.test(f))
             .map((f) => `assets/${f}`)
         : [];
       // The shell entry points. Relative paths resolve against the SW's scope.
@@ -45,7 +73,7 @@ export default defineConfig({
   root: './',
   base: './',
   publicDir: 'public',
-  plugins: [precacheManifestPlugin()],
+  plugins: [precacheManifestPlugin(), selfHostWasmPlugin()],
   build: {
     outDir: 'dist',
     target: 'esnext'

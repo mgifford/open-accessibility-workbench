@@ -18,6 +18,31 @@ export const MODEL_INFO = {
   runtime: 'transformers.js'
 };
 
+/**
+ * Where the model weights are downloaded FROM. Inference always runs locally in
+ * the browser either way — report data never leaves the device. The only
+ * difference is what the weights host sees when the model is fetched: the user's
+ * IP address and which model id, never any report content.
+ *
+ * - 'huggingface': transformers.js default (huggingface.co / its CDN).
+ * - 'github-release': a same-org GitHub Release asset base URL (set at build/deploy
+ *   time via VITE_MODEL_RELEASE_BASE); avoids the Hugging Face host.
+ */
+export const MODEL_SOURCES = {
+  huggingface: {
+    id: 'huggingface',
+    label: 'Hugging Face (default)',
+    note: 'Weights download from huggingface.co. That host sees your IP address and which model you load — never your report.'
+  },
+  'github-release': {
+    id: 'github-release',
+    label: 'GitHub Release (this project)',
+    note: 'Weights download from this project’s GitHub release instead of Hugging Face. GitHub sees your IP and the file requested — never your report.'
+  }
+};
+
+export const DEFAULT_MODEL_SOURCE = 'huggingface';
+
 export const CONSENT_TEXT = [
   'Local AI runs on this device.',
   'This build does not download a separate model; a downloadable local model is planned for a later release.',
@@ -29,7 +54,10 @@ const STORAGE_KEY = 'oaw.aiConsent.v1';
 class AiConsentStore {
   constructor() {
     // status: 'disabled' | 'consented' | 'downloading' | 'ready' | 'error'
-    this.state = { enabled: false, status: 'disabled', progress: 0, message: '', device: null, error: null };
+    this.state = {
+      enabled: false, status: 'disabled', progress: 0, message: '',
+      device: null, error: null, modelSource: DEFAULT_MODEL_SOURCE
+    };
     this.listeners = new Set();
     this._load();
   }
@@ -39,15 +67,25 @@ class AiConsentStore {
       const raw = safeGet(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        // Only the CONSENT preference persists — never a "ready" state (the model
-        // cache may have been evicted; readiness is re-established at runtime).
+        // Only the CONSENT preference and the model-source CHOICE persist — never a
+        // "ready" state (the model cache may have been evicted; readiness is
+        // re-established at runtime).
         if (parsed && parsed.enabled) this.state.enabled = true;
+        if (parsed && MODEL_SOURCES[parsed.modelSource]) this.state.modelSource = parsed.modelSource;
       }
     } catch { /* ignore */ }
   }
 
   _persist() {
-    try { safeSet(STORAGE_KEY, JSON.stringify({ enabled: this.state.enabled })); } catch { /* ignore */ }
+    try { safeSet(STORAGE_KEY, JSON.stringify({ enabled: this.state.enabled, modelSource: this.state.modelSource })); } catch { /* ignore */ }
+  }
+
+  /** User selects where weights download from (persisted). */
+  setModelSource(source) {
+    if (!MODEL_SOURCES[source]) return;
+    this.state.modelSource = source;
+    this._persist();
+    this._notify();
   }
 
   subscribe(l) { this.listeners.add(l); return () => this.listeners.delete(l); }

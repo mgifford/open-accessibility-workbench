@@ -1,104 +1,106 @@
 /**
- * Web Worker for running local Small Language Model (SLM) generation and validation loop.
+ * AI worker (Phase 11/12/15): loads a small language model, runs the bounded
+ * generate→validate loop, and disposes the model — all off the main thread.
+ *
+ * Inference is local; only the model WEIGHTS are fetched (from the user's chosen
+ * host). The deterministic guidance path never depends on this worker: if the
+ * model is not loaded, generation returns an error and the caller falls back.
  */
 
 import { buildRemediationPrompt } from '../ai/prompt.js';
-import { validateAiResponseStructure } from '../ai/response-schema.js';
-import { runValidationSuite } from '../validation/registry.js';
+import { runValidationLoop, buildValidationExport } from '../ai/validation-loop.js';
+import { loadModel, generate as runGenerate, disposeModel } from '../ai/model-runtime.js';
 
-let pipelineInstance = null;
-let currentLoadedModel = null;
+let pipeline = null;
+let loadedModelId = null;
+let loadedDevice = null;
+let loadAbort = null;
+let cancelGeneration = false;
+
+function post(msg) { self.postMessage(msg); }
 
 self.onmessage = async (e) => {
-  const { type, id, task, modelId, sourceContext } = e.data;
+  const { type, id } = e.data || {};
+
+  if (type === 'LOAD_MODEL') {
+    const { modelId, source } = e.data;
+    // If the requested model is already loaded, report ready immediately.
+    if (pipeline && loadedModelId === modelId) {
+      post({ id, type: 'LOADED', device: loadedDevice });
+      return;
+    }
+    // Replace any previously loaded model.
+    await disposeCurrent();
+    loadAbort = new AbortController();
+    try {
+      const res = await loadModel({
+        modelId, source,
+        signal: loadAbort.signal,
+        onProgress: (p) => post({ id, progress: { phase: 'download', progress: p.progress, file: p.file, status: p.status } })
+      });
+      pipeline = res.pipeline;
+      loadedModelId = modelId;
+      loadedDevice = res.device;
+      post({ id, type: 'LOADED', device: res.device });
+    } catch (err) {
+      pipeline = null; loadedModelId = null; loadedDevice = null;
+      if (err && err.name === 'AbortError') post({ id, type: 'LOAD_CANCELLED' });
+      else post({ id, type: 'LOAD_ERROR', error: (err && err.message) || 'Model load failed' });
+    } finally {
+      loadAbort = null;
+    }
+    return;
+  }
+
+  if (type === 'CANCEL_LOAD') {
+    if (loadAbort) loadAbort.abort();
+    return;
+  }
+
+  if (type === 'CANCEL_GENERATION') {
+    cancelGeneration = true;
+    return;
+  }
+
+  if (type === 'DISPOSE') {
+    await disposeCurrent();
+    post({ id, type: 'DISPOSED' });
+    return;
+  }
 
   if (type === 'GENERATE_REMEDIATION') {
+    const { task, sourceContext, validationContext } = e.data;
+    if (!pipeline) { post({ id, success: false, error: 'No model is loaded.' }); return; }
+    cancelGeneration = false;
     try {
-      // 1. Initial Prompt Construction
-      let validationFeedback = null;
-      let attempts = 0;
-      let finalResult = null;
-      const MAX_ATTEMPTS = 2;
-
-      while (attempts < MAX_ATTEMPTS) {
-        attempts++;
-        const prompt = buildRemediationPrompt(task, sourceContext, validationFeedback);
-
-        // Fallback simulated response or real model generation
-        let candidateJson = null;
-
-        // Try using transformers.js pipeline if available
-        if (typeof pipelineInstance !== 'function' && typeof self.pipeline !== 'undefined') {
-          pipelineInstance = self.pipeline;
+      const loop = await runValidationLoop({
+        ruleId: task.ruleId,
+        sourceContext,
+        validationContext: validationContext || { originalSnippet: task.representativeHtml },
+        isCancelled: () => cancelGeneration,
+        generate: async (feedback, attempt) => {
+          post({ id, progress: { phase: 'inference', status: `Generating (attempt ${attempt})…` } });
+          const prompt = buildRemediationPrompt(task, sourceContext, feedback);
+          return runGenerate(pipeline, prompt, { maxNewTokens: 256, temperature: 0.2 });
         }
-
-        if (pipelineInstance) {
-          self.postMessage({ id, progress: { status: `Running inference (Attempt ${attempts}/${MAX_ATTEMPTS})...` } });
-          const output = await pipelineInstance('text-generation', modelId, {
-            prompt,
-            max_new_tokens: 256,
-            temperature: 0.2
-          });
-          try {
-            candidateJson = JSON.parse(output[0]?.generated_text || '{}');
-          } catch (err) {
-            // parsing error
-          }
+      });
+      post({
+        id, success: true,
+        data: {
+          finalCandidate: loop.finalCandidate,     // null unless it passed validation
+          outcome: loop.outcome,
+          validationExport: buildValidationExport(loop, { ruleId: task.ruleId, validationContext }),
+          provenance: loop.finalCandidate ? { generatedByAI: true, model: loadedModelId, device: loadedDevice } : { generatedByAI: false }
         }
-
-        // Deterministic structured fallback if local model is uninitialized or in test mode
-        if (!candidateJson) {
-          candidateJson = {
-            summary: task.blueprint?.problem || 'Accessibility issue detected',
-            rootCauseHypothesis: task.blueprint?.likelyRootCause || 'Shared template markup',
-            confidence: 'high',
-            targetBehavior: task.blueprint?.whatNeedsToChange || 'Satisfy WCAG criteria',
-            recommendedStrategy: 'Apply semantic HTML element or CSS design token adjustment',
-            developerDecisionsRequired: task.blueprint?.humanDecisionsRequired || ['Confirm accessible name'],
-            targetMarkup: task.blueprint?.targetMarkup || null,
-            sourceAwareCandidate: sourceContext ? `// Updated ${sourceContext.filename}\n${task.blueprint?.targetMarkup || ''}` : null,
-            verification: task.blueprint?.verificationSteps || ['Verify with screen reader'],
-            limitations: ['Automated checks cannot verify human reading intent']
-          };
-        }
-
-        // 2. Validate Response Structure
-        const structureCheck = validateAiResponseStructure(candidateJson);
-        if (!structureCheck.valid) {
-          validationFeedback = `Output failed schema validation: ${structureCheck.error}`;
-          continue;
-        }
-
-        // 3. Run Deterministic Validation Loop
-        const validationResult = runValidationSuite(task.ruleId, candidateJson.targetMarkup || candidateJson.sourceAwareCandidate || '', {
-          originalSnippet: task.representativeHtml
-        });
-
-        if (validationResult.passed || attempts >= MAX_ATTEMPTS) {
-          finalResult = {
-            ...candidateJson,
-            attempts,
-            validationResult,
-            generatedByAI: true,
-            model: modelId
-          };
-          break;
-        } else {
-          validationFeedback = `Deterministic validation failed: ${validationResult.status}. Please fix the markup to satisfy this check.`;
-        }
-      }
-
-      self.postMessage({
-        id,
-        success: true,
-        data: finalResult
       });
     } catch (err) {
-      self.postMessage({
-        id,
-        success: false,
-        error: err.message || 'AI inference error'
-      });
+      post({ id, success: false, error: (err && err.message) || 'AI generation error' });
     }
+    return;
   }
 };
+
+async function disposeCurrent() {
+  if (pipeline) { await disposeModel(pipeline); }
+  pipeline = null; loadedModelId = null; loadedDevice = null;
+}

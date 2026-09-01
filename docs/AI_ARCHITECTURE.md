@@ -1,6 +1,9 @@
 # In-Browser AI Architecture & Prompt Safety
 
-Open Accessibility Workbench includes an optional, privacy-first local AI enhancement layer running in a dedicated Web Worker via `@huggingface/transformers`.
+Open Accessibility Workbench includes an optional, privacy-first local AI
+enhancement layer running in a dedicated Web Worker. The real model runtime uses
+`@huggingface/transformers`, is **build-gated** (`VITE_AI_RUNTIME=1`), and is OFF
+in the default/deployed build — see the Phase 15 section below.
 
 ---
 
@@ -155,3 +158,48 @@ false pass.
 inputs, results, manualVerificationRequired }`, plus whether the final candidate
 differs from the first attempt. These checks do not prove accessibility;
 meaningfulness (alt text wording, link purpose) always requires human review.
+
+## On-Device Model Runtime (Phase 15)
+
+The real runtime that executes a model in the browser. It is **build-gated** and
+**OFF by default**.
+
+### Build gating
+- The runtime code (`src/ai/model-runtime.js`, the AI worker, and the
+  `@huggingface/transformers` dependency) is only bundled when built with
+  `VITE_AI_RUNTIME=1`. A normal build tree-shakes the entire dependency and its
+  ~100 MB of WASM out — the default deploy is ~360 KB and honestly downloads no
+  model. `FEATURES.aiModelRuntime` derives from the same build flag, so the UI and
+  the bundle can never disagree.
+
+### Where inference runs vs. where weights come from
+- **Inference is always local.** Report/prompt data never leaves the device.
+- Only the model **weights** are fetched over the network. The user chooses the
+  host (persisted locally):
+  - **Hugging Face** (default) — `huggingface.co`.
+  - **GitHub Release** — a same-org release asset base (`VITE_MODEL_RELEASE_BASE`),
+    avoiding the Hugging Face host.
+  Either way, the weights host sees the user's IP and which model file is
+  requested — never any report content. The UI states this explicitly.
+- The transformers.js **WASM backend is self-hosted** from our own origin
+  (`/wasm/`, copied into the build), so the ONNX runtime is not fetched from a
+  third-party CDN.
+
+### Lifecycle
+- Download → load with real progress; **Cancel** aborts the download; **Remove**
+  disposes the model from memory; **Generate** runs the bounded validation loop
+  (Phase 12) with real inference.
+- Any failure (WebGPU/WASM unavailable, download/parse failure, cancellation,
+  validation failure) falls back to deterministic guidance without losing the task.
+
+### Output framing
+- AI output is presented as a clearly-labelled **draft** for human review — never
+  applied automatically, always beside the deterministic guidance, and only shown
+  after passing the invention checks and deterministic validators. A modest local
+  model can still be wrong; the framing never implies correctness.
+
+### Verification status
+- The wiring is unit-tested with an injected mock library (no network/WebGPU).
+  The download path was confirmed to start against Hugging Face. **Real model load
+  and inference must be verified on WebGPU-capable hardware** before the runtime is
+  enabled in a deploy — see [ROADMAP.md](ROADMAP.md).

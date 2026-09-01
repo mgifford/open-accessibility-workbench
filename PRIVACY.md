@@ -10,7 +10,7 @@ Open Accessibility Workbench is designed with a strict, privacy-first architectu
 2. **Zero Cloud AI / Zero API Keys**: Scan data is never transmitted to any cloud AI service (such as OpenAI, Anthropic, or Google Cloud).
 3. **No Telemetry or Tracking**: The application includes no analytics scripts, tracking beacons, or third-party telemetry.
 4. **No External Database**: All grouping, pattern analysis, and role routing algorithms execute client-side.
-5. **Opt-in Local AI (no cloud, no model download in this build)**: The optional AI advisor is off until you enable it, and any AI processing is designed to run entirely on your device (WebGPU/WebAssembly) — never in the cloud. **This build downloads no separate model**; the advisor composes structured guidance on-device from the deterministic analysis. A downloadable local model is planned for a later release; when added, it would be fetched only after explicit consent. See [docs/ROADMAP.md](docs/ROADMAP.md).
+5. **Opt-in Local AI (on-device inference, no cloud)**: The optional AI advisor is off until you enable it, and inference runs entirely on your device (WebGPU/WebAssembly) — your report is **never** sent to any AI service. A real on-device model runtime exists but is **build-gated and OFF in the default build**, which downloads no model at all. When an AI-enabled build is used, only the model **weights** are downloaded (after explicit consent), from the host you choose — Hugging Face or a GitHub release. That host sees your IP address and which model file you request, never your report contents. See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md).
 
 ---
 

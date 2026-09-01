@@ -15,7 +15,7 @@ _Status legend: ✅ completed · 🟡 scaffolded (degrades to a deterministic pa
 - ✅ **Deterministic Remediation Blueprints**: Generates step-by-step blueprints, human decision checklists, and native HTML remediation guidance without requiring AI.
 - ✅ **Client-Side Privacy Guarantee**: 100% in-browser processing. Zero data uploads, zero telemetry, no cloud AI API keys required. Works offline after one online visit; large reports are analysed in a Web Worker with progress and cancel.
 - ✅ **Multi-Format Export**: Full provenance JSON, JSON-LD, Markdown, and GitHub issue handoffs.
-- 🟡 **Optional In-Browser AI with Validation Loop**: The consent gate, Web-Worker generation path, untrusted-data-safe response processing, invention checks, and bounded validation loop exist and are tested. **This build ships no separate model download** — the advisor composes structured guidance deterministically; a real on-device model runtime is ⬜ planned (see the roadmap).
+- 🟡 **Optional In-Browser AI with Validation Loop**: The consent gate, untrusted-data-safe response processing, invention checks, bounded validation loop, **and a real on-device model runtime** (transformers.js with download/cancel/dispose, WebGPU/WASM inference, a Hugging Face or GitHub-release weights source, and AI output shown as a clearly-labelled draft) are all built. The runtime is **build-gated** (`VITE_AI_RUNTIME=1`) and **OFF in the default build**, which downloads no model and tree-shakes the ~100 MB dependency out. It stays scaffolded until verified on WebGPU hardware — see the [roadmap](docs/ROADMAP.md). Inference is on-device; your report is never uploaded.
 
 ---
 
