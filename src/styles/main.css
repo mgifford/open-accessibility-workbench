@@ -63,8 +63,19 @@ header.app-header {
 
 nav.main-nav ul {
   display: flex;
+  flex-wrap: wrap; /* reflow the nav links at narrow widths (WCAG 1.4.10) */
   list-style: none;
   gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+}
+
+/* Reflow at ~400% zoom / 320px: trim the large horizontal padding so content
+   (header, main, footer) fits without a horizontal scrollbar (WCAG 1.4.10). */
+@media (max-width: 480px) {
+  header.app-header { padding: var(--space-3) var(--space-4); }
+  main.app-main { padding: var(--space-4); }
+  .card { padding: var(--space-4); }
 }
 
 nav.main-nav a {

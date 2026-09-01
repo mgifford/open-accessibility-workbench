@@ -173,11 +173,11 @@ export class TaskList extends HTMLElement {
                   ${renderRoleGuidance(t.roles)}
                   ${t.componentHypothesis ? ` | <strong>Component:</strong> ${escapeHtml(t.componentHypothesis.name)}` : ''}
                 </div>
-                <div style="display: flex; align-items: center; gap: var(--space-3);">
+                <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
                   <span><strong>Affected:</strong> ${t.metrics.affectedPagesCount} pages (${t.metrics.observationCount} occurrences)</span>
-                  <label style="display: flex; align-items: center; gap: var(--space-1);">
+                  <label style="display: flex; align-items: center; gap: var(--space-1); max-width: 100%;">
                     <span style="font-weight: 700;">Status</span>
-                    <select class="task-status-select" data-task-id="${escapeAttr(t.id)}" style="padding: var(--space-1); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+                    <select class="task-status-select" data-task-id="${escapeAttr(t.id)}" style="max-width: 100%; padding: var(--space-1); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
                       ${TASK_STATUSES.map(s => `<option value="${s}" ${taskStatusStore.get(t.id) === s ? 'selected' : ''}>${TASK_STATUS_LABELS[s]}</option>`).join('')}
                     </select>
                   </label>
