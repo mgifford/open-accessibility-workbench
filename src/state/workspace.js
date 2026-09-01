@@ -75,6 +75,7 @@ class WorkspaceStore {
       tasks: [],
       overlapData: null,
       summaryData: null,
+      importNote: null,
       sourceReports: [],
       activeTaskId: null,
       userConfirmedTech: null

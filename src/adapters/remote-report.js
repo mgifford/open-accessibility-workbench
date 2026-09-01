@@ -77,3 +77,19 @@ export async function fetchRemoteReport(rawUrl, opts = {}) {
 export function reportUrlFromLocation(search = (typeof location !== 'undefined' ? location.search : '')) {
   try { return new URLSearchParams(search).get('report'); } catch { return null; }
 }
+
+/**
+ * Given an open-scans summary `report.csv` URL, returns the sibling finding-level
+ * `report.json` URL in the same directory (open-scans publishes both per scan).
+ * Returns null when the URL is not a `report.csv` we recognize. The trust/scheme
+ * classification of the returned URL is still enforced by fetchRemoteReport.
+ * @param {string} rawUrl
+ * @returns {string | null}
+ */
+export function reportJsonSiblingUrl(rawUrl) {
+  let url;
+  try { url = new URL(rawUrl); } catch { return null; }
+  if (!/\/report\.csv$/i.test(url.pathname)) return null;
+  url.pathname = url.pathname.replace(/report\.csv$/i, 'report.json');
+  return url.href;
+}

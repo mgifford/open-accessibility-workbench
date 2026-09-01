@@ -88,7 +88,7 @@ describe('Phase 13: local data clearing (§13.2)', () => {
   });
 });
 
-import { classifyReportUrl, fetchRemoteReport, reportUrlFromLocation, TRUSTED_REPORT_HOSTS } from '../../src/adapters/remote-report.js';
+import { classifyReportUrl, fetchRemoteReport, reportUrlFromLocation, reportJsonSiblingUrl, TRUSTED_REPORT_HOSTS } from '../../src/adapters/remote-report.js';
 
 describe('Phase 13: secure remote report loading (§13.5)', () => {
   test('rejects non-HTTPS and unsafe schemes; allows localhost http', () => {
@@ -102,6 +102,16 @@ describe('Phase 13: secure remote report loading (§13.5)', () => {
   test('a documented trusted host loads without extra confirmation; others require it', () => {
     assert.equal(classifyReportUrl(`https://${TRUSTED_REPORT_HOSTS[0]}/r.json`).trusted, true);
     assert.equal(classifyReportUrl('https://random.example/r.json').trusted, false);
+  });
+
+  test('report.csv URL maps to its finding-level report.json sibling; other URLs do not', () => {
+    assert.equal(
+      reportJsonSiblingUrl('https://mgifford.github.io/open-scans/reports/issues/issue-338/2026-08-05T14-36-34-116Z/report.csv'),
+      'https://mgifford.github.io/open-scans/reports/issues/issue-338/2026-08-05T14-36-34-116Z/report.json'
+    );
+    assert.equal(reportJsonSiblingUrl('https://example.test/report.json'), null);
+    assert.equal(reportJsonSiblingUrl('https://example.test/data/other.csv'), null);
+    assert.equal(reportJsonSiblingUrl('not a url'), null);
   });
 
   test('arbitrary origin needs confirmation before fetch', async () => {

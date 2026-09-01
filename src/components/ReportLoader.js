@@ -12,7 +12,7 @@ import { buildRemediationTasks } from '../analysis/remediation-tasks.js';
 import { makeSourceReport } from '../analysis/source-registry.js';
 import { technologyStore } from '../state/technology.js';
 import { checkFileSize } from '../utils/input-limits.js';
-import { fetchRemoteReport, reportUrlFromLocation } from '../adapters/remote-report.js';
+import { fetchRemoteReport, reportUrlFromLocation, reportJsonSiblingUrl } from '../adapters/remote-report.js';
 import { workspaceStore } from '../state/workspace.js';
 
 export class ReportLoader extends HTMLElement {
@@ -41,7 +41,46 @@ export class ReportLoader extends HTMLElement {
       return;
     }
     if (!result.ok) { this.showError(result.error); return; }
+
+    // A summary report.csv carries only per-page/per-engine counts — no
+    // finding-level evidence — so it yields no remediation tasks. open-scans
+    // publishes a finding-level report.json beside it; when this URL is such a
+    // CSV, load that sibling instead so results cascade into tasks. If the
+    // sibling is missing or unrecognized, fall back to the summary CSV.
+    const upgraded = await this.tryUpgradeCsvToJsonSibling(url, result.text, confirmedArbitrary);
+    if (upgraded) return;
+
     this.processFileContent(result.text, result.filename);
+  }
+
+  /**
+   * When `url` is an open-scans summary report.csv, fetch and use its
+   * finding-level report.json sibling instead. Returns true when the sibling was
+   * loaded (and processed), false to let the caller handle the CSV normally.
+   */
+  async tryUpgradeCsvToJsonSibling(url, csvText, confirmedArbitrary) {
+    const siblingUrl = reportJsonSiblingUrl(url);
+    if (!siblingUrl) return false;
+    // Only upgrade when the fetched content really is an open-scans summary CSV.
+    const detection = detectReportSource(csvText, 'report.csv');
+    if (detection.type !== REPORT_TYPES.OPEN_SCANS_CSV) return false;
+
+    const sibling = await fetchRemoteReport(siblingUrl, { confirmedArbitrary });
+    if (!sibling.ok) return false; // no sibling / blocked: keep the summary CSV
+    const siblingDetection = detectReportSource(sibling.text, sibling.filename);
+    if (siblingDetection.type !== REPORT_TYPES.OPEN_SCANS_JSON) return false;
+
+    // Discover the overlap sibling too (optional), matching the sample loader.
+    let overlapText = null;
+    try {
+      const overlap = await fetchRemoteReport(siblingUrl.replace(/report\.json$/i, 'report-overlap.json'), { confirmedArbitrary });
+      if (overlap.ok) overlapText = overlap.text;
+    } catch { /* overlap is optional */ }
+
+    this.processFileContent(sibling.text, sibling.filename, overlapText, {
+      note: 'This is a page-summary CSV (counts only). Loaded the finding-level report.json beside it so results cascade into remediation tasks.'
+    });
+    return true;
   }
 
   render() {
@@ -182,7 +221,8 @@ export class ReportLoader extends HTMLElement {
     reader.readAsText(file);
   }
 
-  processFileContent(content, filename, overlapContent = null) {
+  processFileContent(content, filename, overlapContent = null, opts = {}) {
+    const note = opts.note ? `${opts.note} ` : '';
     const errorBox = this.querySelector('#error-container');
     errorBox.style.display = 'none';
 
@@ -229,6 +269,7 @@ export class ReportLoader extends HTMLElement {
           tasks: [],
           overlapData: detection.type === REPORT_TYPES.OPEN_SCANS_OVERLAP_JSON ? summaryData.overlap : null,
           summaryData,
+          importNote: null,
           statusMessage: `Summary report loaded (${detection.format}).`
         });
         window.location.hash = '#/overview';
@@ -333,7 +374,8 @@ export class ReportLoader extends HTMLElement {
         tasks,
         overlapData,
         summaryData: null,
-        statusMessage: `Report loaded. ${observations.length} observations analyzed into ${tasks.length} remediation tasks.`
+        importNote: opts.note || null,
+        statusMessage: `${note}Report loaded. ${observations.length} observations analyzed into ${tasks.length} remediation tasks.`
       });
 
       // Navigate to overview

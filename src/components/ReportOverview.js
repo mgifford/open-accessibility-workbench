@@ -202,7 +202,7 @@ export class ReportOverview extends HTMLElement {
   }
 
   render() {
-    const { loaded, observations, clusters, hypotheses, tasks, sourceSummary, overlapData, summaryData } = workspaceStore.state;
+    const { loaded, observations, clusters, hypotheses, tasks, sourceSummary, overlapData, summaryData, importNote } = workspaceStore.state;
     const { selectedCapabilities } = profileStore.state;
 
     if (!loaded) {
@@ -238,6 +238,11 @@ export class ReportOverview extends HTMLElement {
           </div>
           <a href="#/tasks" class="btn btn-primary">View All Tasks (${tasks.length})</a>
         </div>
+
+        ${importNote ? `
+        <p role="status" style="background: var(--color-brand-bg); color: var(--color-text-primary); border: 1px solid var(--color-border); border-left: 4px solid var(--color-brand-primary); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); margin-bottom: var(--space-4); font-size: var(--font-size-sm);">
+          ${escapeHtml(importNote)}
+        </p>` : ''}
 
         ${this.renderScanSummary(sourceSummary, overlapData)}
 
