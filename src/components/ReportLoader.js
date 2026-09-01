@@ -199,13 +199,21 @@ export class ReportLoader extends HTMLElement {
   }
 
   loadFile(file) {
+    // Check the declared size BEFORE allocating memory by reading the file, so a
+    // pathologically large file is refused rather than loaded and then rejected
+    // (spec §13.3). File.size is exact bytes.
+    const sizeCheck = checkFileSize(file.size);
+    if (!sizeCheck.ok) { this.showError(sizeCheck.error); return; }
+    if (sizeCheck.warn && !this.confirmLargeFile(file.size)) return;
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       let text = e.target.result;
+      const isCompressed = /\.json\.gz\.b64$/i.test(file.name);
       // Compressed Oobee payloads: .json.gz.b64 (base64-encoded gzip). Decompress
       // locally before detection; report a clear error if the browser lacks the
       // needed API rather than feeding garbage to the detector.
-      if (/\.json\.gz\.b64$/i.test(file.name)) {
+      if (isCompressed) {
         try {
           text = await decompressGzipB64(text);
         } catch (err) {
@@ -213,12 +221,25 @@ export class ReportLoader extends HTMLElement {
           return;
         }
       }
-      this.processFileContent(text, file.name.replace(/\.gz\.b64$/i, ''));
+      // For an uncompressed file the size was already confirmed from File.size, so
+      // don't prompt again. For a compressed file the DECOMPRESSED size is what
+      // matters, so let processFileContent re-check (and warn/refuse) on it.
+      this.processFileContent(text, file.name.replace(/\.gz\.b64$/i, ''), null, { sizeConfirmed: !isCompressed });
     };
     reader.onerror = () => {
       this.showError('Error reading local file.');
     };
     reader.readAsText(file);
+  }
+
+  /**
+   * Asks the user to confirm before processing a large report. Returns true to
+   * proceed. Uses a native confirm so it is keyboard-accessible and blocking.
+   */
+  confirmLargeFile(bytes) {
+    const mb = (bytes / (1024 * 1024)).toFixed(1);
+    return typeof confirm !== 'function' ||
+      confirm(`This report is about ${mb} MB. Large reports can take a while and may briefly slow this tab while they are analyzed. Continue?`);
   }
 
   processFileContent(content, filename, overlapContent = null, opts = {}) {
@@ -227,9 +248,17 @@ export class ReportLoader extends HTMLElement {
     errorBox.style.display = 'none';
 
     // Guard against gigantic input before doing expensive work (spec §13.3).
+    // For local files the size is checked before reading; this backstops remote
+    // and programmatic loads. `content` here is a string (bytes counted as UTF-8).
     const sizeCheck = checkFileSize(content);
     if (!sizeCheck.ok) {
       this.showError(sizeCheck.error);
+      return;
+    }
+    // Warn before processing a large report loaded by means other than a local
+    // file picker (which warns earlier). `opts.sizeConfirmed` avoids a double
+    // prompt when the file picker already asked.
+    if (sizeCheck.warn && !opts.sizeConfirmed && !this.confirmLargeFile(sizeCheck.bytes)) {
       return;
     }
 

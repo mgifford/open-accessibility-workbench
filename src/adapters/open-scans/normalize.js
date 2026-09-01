@@ -4,7 +4,7 @@
  */
 
 import { parseWcagTags, wcagLevelFromTags } from '../../utils/wcag-tags.js';
-import { capField } from '../../utils/input-limits.js';
+import { capField, capShort, capUrl } from '../../utils/input-limits.js';
 
 /**
  * @param {object} openScansReport
@@ -24,9 +24,9 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
   for (let pageIndex = 0; pageIndex < openScansReport.results.length; pageIndex++) {
     const pageResult = openScansReport.results[pageIndex];
     const page = {
-      submittedUrl: pageResult.submittedUrl || '',
-      finalUrl: pageResult.finalUrl || pageResult.submittedUrl || '',
-      title: pageResult.pageTitle || '',
+      submittedUrl: capUrl(pageResult.submittedUrl || ''),
+      finalUrl: capUrl(pageResult.finalUrl || pageResult.submittedUrl || ''),
+      title: capShort(pageResult.pageTitle || ''),
       browser: pageResult.scanContext?.browser || openScansReport.scanContext?.browser || 'unknown',
       viewport: pageResult.scanContext?.viewport || openScansReport.scanContext?.viewport || null,
       colorScheme: pageResult.scanContext?.colorScheme || openScansReport.scanContext?.colorScheme || 'light'
@@ -79,12 +79,12 @@ export function normalizeOpenScansReportJson(openScansReport, importedRef = 'rep
               actRules: []
             },
             evidence: {
-              description: failure.message || '',
+              description: capField(failure.message || ''),
               renderedHtml: capField(failure.html || ''),
-              locator: failure.xpath || '',
+              locator: capShort(failure.xpath || ''),
               locatorType: failure.xpath?.startsWith('/') ? 'xpath' : 'selector',
-              scannerGuidance: failure.fixSummary || '',
-              helpUrl: failure.ruleUrl || null
+              scannerGuidance: capField(failure.fixSummary || ''),
+              helpUrl: failure.ruleUrl ? capUrl(failure.ruleUrl) : null
             },
             identity: {
               sourceFindingId: failure.fingerprint || null,

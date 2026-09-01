@@ -7,6 +7,8 @@
  * back to local download + upload.
  */
 
+import { MAX_FILE_BYTES } from '../utils/input-limits.js';
+
 // Documented trusted report hosts (may load without extra confirmation).
 export const TRUSTED_REPORT_HOSTS = ['mgifford.github.io'];
 
@@ -62,6 +64,13 @@ export async function fetchRemoteReport(rawUrl, opts = {}) {
     });
     if (!res.ok) {
       return { ok: false, error: `The report host responded with ${res.status}. Download the report and upload it here instead.` };
+    }
+    // Refuse before consuming the body when the server declares an over-limit
+    // size (spec §13.3). Not all servers send Content-Length; the string-size
+    // backstop in the loader still applies after consumption.
+    const declared = Number(res.headers && res.headers.get && res.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > MAX_FILE_BYTES) {
+      return { ok: false, error: `The report is ${(declared / (1024 * 1024)).toFixed(0)} MB, above the ${MAX_FILE_BYTES / (1024 * 1024)} MB limit. Download and filter it, then upload it here.` };
     }
     const text = await res.text();
     const filename = cls.url.pathname.split('/').pop() || 'report';

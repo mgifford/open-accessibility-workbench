@@ -4,7 +4,7 @@
  */
 
 import { parseWcagTags, wcagLevelFromTags } from '../../utils/wcag-tags.js';
-import { capField } from '../../utils/input-limits.js';
+import { capField, capShort, capUrl } from '../../utils/input-limits.js';
 
 /**
  * @param {Array<Record<string, string>>} oobeeRecords
@@ -59,9 +59,9 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
         recordPointer: `row:${i}`
       },
       page: {
-        submittedUrl: row.url || '',
-        finalUrl: row.url || '',
-        title: row.pageTitle || '',
+        submittedUrl: capUrl(row.url || ''),
+        finalUrl: capUrl(row.url || ''),
+        title: capShort(row.pageTitle || ''),
         browser: row.deviceChosen || 'desktop',
         viewport: null,
         colorScheme: null
@@ -79,12 +79,12 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
         actRules: []
       },
       evidence: {
-        description: row.issueDescription || '',
+        description: capField(row.issueDescription || ''),
         renderedHtml: capField(row.context || ''),
-        locator: row.xpath || '',
+        locator: capShort(row.xpath || ''),
         locatorType: 'xpath',
-        scannerGuidance: row.howToFix || '',
-        helpUrl: row.learnMore || null
+        scannerGuidance: capField(row.howToFix || ''),
+        helpUrl: row.learnMore ? capUrl(row.learnMore) : null
       },
       identity: {
         // Oobee provides no upstream ids; this is a Workbench-derived composite
