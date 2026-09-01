@@ -20,7 +20,7 @@ export const MODEL_INFO = {
 
 export const CONSENT_TEXT = [
   'Local AI runs on this device.',
-  'Enabling it may download a model and store it in your browser cache.',
+  'This build does not download a separate model; a downloadable local model is planned for a later release.',
   'Your accessibility report is not sent to a cloud AI service.'
 ].join('\n');
 
