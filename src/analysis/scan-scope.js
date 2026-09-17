@@ -93,6 +93,38 @@ export function commonPatterns({ tasks = [] } = {}, limit = 5) {
 }
 
 /**
+ * Explainable strength label for a pattern cluster: how confident we are that it
+ * is a real recurring pattern worth prioritising, based on reach — not an opaque
+ * score. "strong" = recurs across many pages; "moderate" = a few pages;
+ * "isolated" = a single page (still a finding, but not yet a cross-page pattern).
+ * @param {{ pagesCount?: number, pagesPercentage?: number, occurrencesCount?: number }} cluster
+ */
+export function patternStrength(cluster = {}) {
+  const pages = cluster.pagesCount || 0;
+  const pct = cluster.pagesPercentage || 0;
+  if (pages >= 3 || pct >= 50) return 'strong';
+  if (pages === 2) return 'moderate';
+  return 'isolated';
+}
+
+const STRENGTH_ORDER = { strong: 0, moderate: 1, isolated: 2 };
+
+/**
+ * Orders pattern clusters so the highest-confidence recurring patterns lead:
+ * by strength band, then pages affected, then occurrences. Returns a new array;
+ * the input is not mutated.
+ */
+export function rankPatternsByStrength(clusters = []) {
+  return [...clusters].sort((a, b) => {
+    const sa = STRENGTH_ORDER[patternStrength(a)];
+    const sb = STRENGTH_ORDER[patternStrength(b)];
+    if (sa !== sb) return sa - sb;
+    if ((b.pagesCount || 0) !== (a.pagesCount || 0)) return (b.pagesCount || 0) - (a.pagesCount || 0);
+    return (b.occurrencesCount || 0) - (a.occurrencesCount || 0);
+  });
+}
+
+/**
  * One call that assembles the whole scope header model a view needs. Returns
  * null when nothing is loaded, so a caller can render nothing.
  */
