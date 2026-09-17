@@ -28,6 +28,49 @@ import {
   generateRemediation, cancelGeneration
 } from './client.js';
 
+/**
+ * Consumes a Prompt API streaming response, reporting cumulative text to
+ * `onDelta` as chunks arrive, and resolves with the FULL text. Browsers differ
+ * on whether each chunk is the incremental delta or the running total; we
+ * normalise to cumulative so callers always receive the whole answer-so-far and
+ * the final return value is complete. Works with either an async-iterable
+ * stream or a ReadableStream reader.
+ */
+export async function streamPrompt(session, prompt, opts, onDelta) {
+  const stream = session.promptStreaming(prompt, opts);
+  let full = '';
+  const consume = (chunk) => {
+    const text = typeof chunk === 'string' ? chunk : String(chunk ?? '');
+    // Detect a running-total stream (each chunk starts with what we already
+    // have) vs. an incremental one, and normalise to cumulative.
+    if (text.length >= full.length && text.startsWith(full)) full = text;
+    else full += text;
+    onDelta(full);
+  };
+
+  if (stream && typeof stream[Symbol.asyncIterator] === 'function') {
+    for await (const chunk of stream) consume(chunk);
+    return full;
+  }
+  if (stream && typeof stream.getReader === 'function') {
+    const reader = stream.getReader();
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        consume(value);
+      }
+    } finally {
+      reader.releaseLock?.();
+    }
+    return full;
+  }
+  // Not actually streamable — fall back to awaiting it as a whole.
+  const whole = await stream;
+  if (whole) { full = String(whole); onDelta(full); }
+  return full;
+}
+
 // The remediation-JSON contract every model route is asked to emit. Kept here so
 // a browser Prompt API that supports response constraints can be handed a schema;
 // the deterministic response-processor remains the real gate regardless.
@@ -63,8 +106,14 @@ async function runLoopWith({ task, sourceContext, validationContext, generateTex
     validationContext: ctx,
     isCancelled,
     generate: async (feedback, attempt) => {
-      onProgress?.({ phase: 'inference', status: `Generating (attempt ${attempt})…` });
-      return generateText(buildRemediationPrompt(task, sourceContext, feedback));
+      onProgress?.({ phase: 'inference', status: `Generating (attempt ${attempt})…`, attempt });
+      // `generateText` may accept an onDelta second arg (streaming providers).
+      // The partial text is for a live in-progress preview only — it is raw and
+      // unverified; the returned full text still goes through the validation gate.
+      const onDelta = onProgress
+        ? (partial) => onProgress({ phase: 'inference', status: `Generating (attempt ${attempt})…`, attempt, partial })
+        : null;
+      return generateText(buildRemediationPrompt(task, sourceContext, feedback), onDelta);
     }
   });
   return {
@@ -125,8 +174,27 @@ export function createBrowserPromptProvider(root = globalThis, options = {}) {
     return session;
   }
 
-  async function generateText(prompt) {
+  /**
+   * Generates the model's raw text. When `onDelta` is supplied AND the session
+   * exposes `promptStreaming()`, the answer is streamed and each incremental
+   * chunk is reported so the UI can show progress live; the FULL text is still
+   * returned and is what the validation loop consumes (streaming changes only
+   * how the wait is shown, never what is validated or committed). Falls back to
+   * the non-streaming `prompt()` otherwise.
+   */
+  async function generateText(prompt, onDelta = null) {
     const s = await ensureSession();
+    const canStream = typeof onDelta === 'function' && typeof s.promptStreaming === 'function';
+
+    if (canStream) {
+      try {
+        return await streamPrompt(s, prompt, { responseConstraint: REMEDIATION_SCHEMA, signal: options.signal }, onDelta);
+      } catch (error) {
+        if (!/constraint|schema|option|unsupported/i.test(error.message || '')) throw error;
+        return await streamPrompt(s, prompt, { signal: options.signal }, onDelta);
+      }
+    }
+
     try {
       return await s.prompt(prompt, { responseConstraint: REMEDIATION_SCHEMA, signal: options.signal });
     } catch (error) {

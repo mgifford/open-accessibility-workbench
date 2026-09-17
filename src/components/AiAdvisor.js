@@ -148,7 +148,7 @@ export class AiAdvisor extends HTMLElement {
           ${!downloadable || s.status === 'ready' ? '<button type="button" class="btn btn-primary" id="ai-generate-btn">Generate draft suggestion</button>' : ''}
           <button type="button" class="btn btn-secondary" id="ai-disable-btn">Disable local AI</button>
         </div>
-        ${this._generating ? '<p role="status" aria-live="polite" style="font-size: var(--font-size-sm); margin-top: var(--space-2);">Generating a draft…</p>' : ''}
+        ${this._generating ? `<p role="status" aria-live="polite" style="font-size: var(--font-size-sm); margin-top: var(--space-2);">Generating a draft…</p>${this.renderStreamPreview()}` : ''}
         ${draft ? this.renderDraft(draft) : ''}
         ${this.draftDisclaimer()}
       </div>`;
@@ -194,7 +194,7 @@ export class AiAdvisor extends HTMLElement {
           <button type="button" class="btn btn-secondary" id="ai-disable-btn">Disable local AI</button>
         </div>
 
-        ${this._generating ? '<p role="status" aria-live="polite" style="font-size: var(--font-size-sm); margin-top: var(--space-2);">Generating a draft… <button type="button" class="btn btn-secondary" id="ai-cancel-gen">Cancel</button></p>' : ''}
+        ${this._generating ? `<p role="status" aria-live="polite" style="font-size: var(--font-size-sm); margin-top: var(--space-2);">Generating a draft… <button type="button" class="btn btn-secondary" id="ai-cancel-gen">Cancel</button></p>${this.renderStreamPreview()}` : ''}
 
         ${draft ? this.renderDraft(draft) : ''}
         ${this.draftDisclaimer()}
@@ -241,20 +241,57 @@ export class AiAdvisor extends HTMLElement {
   /** Shared: run the current provider's generate and store the draft. */
   async _generate() {
     if (!this._task) { aiConsentStore.setState({ message: 'Open a task to generate a suggestion.' }); return; }
-    this._draft = null; this._generating = true; this.render();
+    this._draft = null; this._generating = true; this._streamPartial = ''; this.render();
     try {
       const data = await this.provider().generate({
         task: this._task,
         sourceContext: this._task.sourceContext || null,
         validationContext: { originalSnippet: this._task.representativeHtml },
-        onProgress: (p) => { if (p?.status) aiConsentStore.setState({ message: p.status }); }
+        onProgress: (p) => {
+          if (p?.status) aiConsentStore.setState({ message: p.status });
+          // Live token stream (browser Prompt API): update only the in-progress
+          // preview, cheaply, without a full re-render of the whole panel.
+          if (typeof p?.partial === 'string') {
+            this._streamPartial = p.partial;
+            this._updateStreamPreview();
+          }
+        }
       });
       this._draft = data;
     } catch (err) {
       this._draft = { error: err.message || 'Generation failed' };
     } finally {
       this._generating = false;
+      this._streamPartial = '';
       this.render();
+    }
+  }
+
+  /**
+   * Renders the live streaming preview. The partial text is the model's RAW,
+   * UNVERIFIED output as it arrives — shown so the wait feels alive, but clearly
+   * labelled and never mistaken for the validated draft, which only appears
+   * after the invention + validation gate passes.
+   */
+  renderStreamPreview() {
+    if (!this._generating) return '';
+    const partial = this._streamPartial || '';
+    return `
+      <div id="ai-stream-preview" style="margin-top: var(--space-2); padding: var(--space-3); border: 1px dashed var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-subtle);">
+        <div style="display:flex; align-items:center; gap:var(--space-2);">
+          <span class="badge badge-medium">Drafting…</span>
+          <span style="font-size: var(--font-size-xs); color: var(--color-text-muted);">raw model output — not yet checked</span>
+        </div>
+        <pre id="ai-stream-text" aria-live="polite" style="white-space: pre-wrap; word-break: break-word; max-height: 12em; overflow-y: auto; font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-2); font-family: var(--font-mono);">${escapeHtml(partial)}</pre>
+      </div>`;
+  }
+
+  /** Cheap in-place update of the streaming preview text (no full re-render). */
+  _updateStreamPreview() {
+    const el = this.querySelector('#ai-stream-text');
+    if (el) {
+      el.textContent = this._streamPartial || '';
+      el.scrollTop = el.scrollHeight;
     }
   }
 
