@@ -87,7 +87,11 @@ nav.main-nav a {
   text-decoration: none;
   font-weight: 500;
   border-radius: var(--radius-md);
-  transition: background-color 0.15s ease;
+  /* No background-color transition: the active-link background is a theme token
+     (--color-brand-bg) that flips value between light/dark. Animating it made the
+     active link render a low-contrast intermediate frame during a theme switch —
+     tripping WCAG 1.4.3 (foreground on a half-composited background). State
+     changes here are instant, which keeps contrast at the tested resting value. */
 }
 
 nav.main-nav a:hover {
