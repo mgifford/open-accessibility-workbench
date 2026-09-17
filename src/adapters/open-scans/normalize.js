@@ -117,6 +117,129 @@ function hasImpact(v) {
   return typeof v === 'string' && v.trim() !== '';
 }
 
+/**
+ * Builds low-fidelity, rule-only CanonicalObservations from a multi-engine
+ * open-scans page-summary CSV. Each observation is one (page, engine, ruleId)
+ * from an engine's `*_failed_rules` list. The CSV carries no element evidence,
+ * so `renderedHtml`/`locator` are empty and `evidenceLevel` is 'rule-only' — the
+ * UI states this honestly and the sibling report.json remains the element-level
+ * source.
+ *
+ * axe is authoritative (see report-csv.js): an axe-backed finding is marked
+ * `authoritative: true` so ranking can float it above findings only a
+ * supplementary engine reported.
+ *
+ * @param {Array<object>} pages - parser page rows (with `.engines`)
+ * @param {string[]} engines - discovered engine prefixes
+ * @param {string} [importedRef="report.csv"]
+ * @returns {Array<import('../../analysis/canonicalize.js').CanonicalObservation>}
+ */
+export function normalizeOpenScansCsvObservations(pages, engines, importedRef = 'report.csv') {
+  if (!Array.isArray(pages)) return [];
+  const importedAt = new Date().toISOString();
+  const observations = [];
+  let recordIndex = 0;
+
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const p = pages[pageIndex];
+    const scanId = String(p.issueNumber || p.scanTitle || 'open-scans-csv');
+    const page = {
+      submittedUrl: capUrl(p.submittedUrl || ''),
+      finalUrl: capUrl(p.finalUrl || p.submittedUrl || ''),
+      title: capShort(p.pageTitle || ''),
+      browser: p.browser || 'unknown',
+      viewport: null,
+      colorScheme: null
+    };
+
+    for (const engine of engines) {
+      const engData = p.engines?.[engine];
+      if (!engData || !Array.isArray(engData.failedRules)) continue;
+      const isAxe = engine === 'axe';
+
+      for (const rawRule of engData.failedRules) {
+        recordIndex++;
+        // A failed-rules entry may be a bare rule id or a rule-doc URL; keep the
+        // last path segment as the id when it is a URL (e.g. an alfa sia-r14 URL).
+        const sourceRuleId = capShort(ruleIdFromEntry(rawRule));
+        const recordPointer = `/pages/${pageIndex}/${engine}/failed_rules/${rawRule}`;
+
+        observations.push({
+          id: `obs-oscsv-${scanId}-${recordIndex}`,
+          schemaVersion: '1.0',
+          source: {
+            system: 'open-scans',
+            version: null,
+            format: 'report.csv',
+            scanId,
+            sourceReportId: null,
+            importedAt,
+            originalRef: importedRef,
+            recordPointer
+          },
+          page: { ...page },
+          classification: {
+            // The CSV has no per-rule impact or category; do not fabricate one.
+            sourceCategory: null,
+            impact: null,
+            impactSource: 'none',
+            wcagLevel: null
+          },
+          rule: {
+            sourceRuleId,
+            normalizedRuleId: normalizeRuleName(sourceRuleId),
+            wcag: [],
+            actRules: []
+          },
+          evidence: {
+            // Rule-only: the CSV names the failing rule per page but not the
+            // element. Empty evidence is honest; do not invent a snippet.
+            description: '',
+            renderedHtml: '',
+            locator: '',
+            locatorType: 'none',
+            scannerGuidance: '',
+            helpUrl: isUrlEntry(rawRule) ? capUrl(rawRule) : null,
+            evidenceLevel: 'rule-only'
+          },
+          identity: {
+            sourceFindingId: null,
+            sourceFindingIdSource: 'workbench-derived',
+            sourcePatternId: null,
+            sourceOccurrenceId: null,
+            sourceFingerprint: null
+          },
+          duplicate: { sourceMarkedDuplicate: false, duplicateOf: null },
+          provenance: {
+            scanner: engine,
+            authoritative: isAxe,
+            sourceRecordIndex: recordIndex
+          }
+        });
+      }
+    }
+  }
+
+  return observations;
+}
+
+function isUrlEntry(entry) {
+  return typeof entry === 'string' && /^https?:\/\//i.test(entry.trim());
+}
+
+/** Extracts a rule id from a failed-rules entry that may be a bare id or a URL. */
+function ruleIdFromEntry(entry) {
+  const s = String(entry || '').trim();
+  if (!s) return 'unknown-rule';
+  if (isUrlEntry(s)) {
+    try {
+      const path = new URL(s).pathname.replace(/\/+$/, '');
+      return path.split('/').pop() || s;
+    } catch { return s; }
+  }
+  return s;
+}
+
 function normalizeRuleName(rawRule) {
   const lower = rawRule.toLowerCase().trim();
   if (lower.includes('color-contrast') || lower === 'qw-act-r37') return 'color-contrast';
