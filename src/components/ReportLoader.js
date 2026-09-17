@@ -121,6 +121,7 @@ export class ReportLoader extends HTMLElement {
           <div style="display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;">
             <span style="font-size: var(--font-size-sm); color: var(--color-text-muted);">Quick Sample Reports:</span>
             <button type="button" class="btn btn-secondary" id="load-sample-openscans">Load Open Scans Sample (Issue #347)</button>
+            <button type="button" class="btn btn-secondary" id="load-sample-multi-engine">Load Multi-Engine Sample</button>
             <button type="button" class="btn btn-secondary" id="load-sample-pattern">Load Pattern-Reduction Demo</button>
             <button type="button" class="btn btn-secondary" id="load-sample-oobee">Load Oobee Sample</button>
           </div>
@@ -133,6 +134,7 @@ export class ReportLoader extends HTMLElement {
     const fileInput = this.querySelector('#file-input');
     const dropzone = this.querySelector('#dropzone');
     const sampleOsBtn = this.querySelector('#load-sample-openscans');
+    const sampleMultiEngineBtn = this.querySelector('#load-sample-multi-engine');
     const samplePatternBtn = this.querySelector('#load-sample-pattern');
     const sampleOobeeBtn = this.querySelector('#load-sample-oobee');
 
@@ -162,6 +164,15 @@ export class ReportLoader extends HTMLElement {
         } catch { /* overlap is optional */ }
 
         this.processFileContent(text, 'report.json', overlapText);
+      } catch (err) {
+        this.showError('Could not load sample file: ' + err.message);
+      }
+    });
+
+    sampleMultiEngineBtn.addEventListener('click', async () => {
+      try {
+        const text = await this.fetchSample('open-scans/report-multi-engine.csv');
+        this.processFileContent(text, 'report.csv');
       } catch (err) {
         this.showError('Could not load sample file: ' + err.message);
       }
