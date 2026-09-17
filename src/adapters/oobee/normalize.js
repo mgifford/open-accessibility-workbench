@@ -22,7 +22,7 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
   for (let i = 0; i < oobeeRecords.length; i++) {
     const row = oobeeRecords[i];
     const ruleId = row.issueId || row.rule || 'unknown-rule';
-    const severity = row.severity || 'mustFix';
+    const severity = normalizeSeverity(row.severity);
     // Retain the scanner's axe impact exactly; do NOT fabricate one from the
     // severity category when the scanner did not report an impact (the two are
     // distinct concepts). `impactSource` records provenance.
@@ -110,6 +110,28 @@ export function normalizeOobeeCsvRecords(oobeeRecords, importedRef = 'report.csv
   }
 
   return observations;
+}
+
+/**
+ * Maps an Oobee CSV `severity` value to a canonical category token. Oobee emits
+ * the camelCase tokens (`mustFix` / `goodToFix` / `needsReview`) in its native
+ * export, but reports produced through its Playwright/axe path use the
+ * human-readable labels (`"Must Fix"` / `"Good to Fix"` / `"Needs Review"`, and
+ * the `"Need to Review"` variant). Downstream scoring (leverage.js) and the
+ * summary counts compare against the canonical tokens, so both spellings must
+ * collapse to the same value or findings are mis-scored and undercounted.
+ * Unknown values default to `mustFix` (fail safe: surface, don't hide).
+ */
+function normalizeSeverity(raw) {
+  if (typeof raw !== 'string' || raw.trim() === '') return 'mustFix';
+  const key = raw.trim().toLowerCase().replace(/[\s_-]+/g, '');
+  switch (key) {
+    case 'mustfix': return 'mustFix';
+    case 'goodtofix': return 'goodToFix';
+    case 'needsreview':
+    case 'needtoreview': return 'needsReview';
+    default: return 'mustFix';
+  }
 }
 
 function normalizeOobeeRule(ruleId) {

@@ -39,6 +39,29 @@ describe('Oobee Adapter Contract', () => {
     assert.equal(needsReview[0].rule.normalizedRuleId, 'image-alt');
   });
 
+  test('normalizes human-readable severity labels (axe/Playwright export) to canonical tokens', () => {
+    // Oobee's Playwright/axe export path emits title-case labels with spaces
+    // ("Good to Fix") rather than the camelCase tokens ("goodToFix") its native
+    // export uses. Both must land in the same canonical category so downstream
+    // scoring and summary counts agree; otherwise findings are undercounted.
+    const header =
+      'severity,issueId,wcagConformance,url,pageTitle,context,howToFix,axeImpact,xpath,learnMore';
+    const raw = [
+      header,
+      '"Must Fix",link-name,wcag2a,https://x.test/a,A,"<a></a>",fix,serious,/html,',
+      '"Good to Fix",region,best-practice,https://x.test/b,B,"<div></div>",fix,moderate,/html,',
+      '"Needs Review",image-alt,wcag2a,https://x.test/c,C,"<img>",fix,minor,/html,',
+      '"Need to Review",heading-order,wcag2a,https://x.test/d,D,"<h3></h3>",fix,minor,/html,'
+    ].join('\n');
+
+    const result = parseOobeeReportCsv(raw);
+    assert.equal(result.severityCounts.mustFix, 1);
+    assert.equal(result.severityCounts.goodToFix, 1);
+    // Both "Needs Review" and "Need to Review" collapse to needsReview.
+    assert.equal(result.severityCounts.needsReview, 2);
+    assert.equal(result.severityCounts.total, 4);
+  });
+
   test('Phase 3 gate: a finding retains all required Oobee fields', () => {
     const raw = fs.readFileSync(path.join(fixturesDir, 'report.csv'), 'utf8');
     const result = parseOobeeReportCsv(raw);

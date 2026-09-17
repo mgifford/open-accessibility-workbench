@@ -2,7 +2,7 @@ import { workspaceStore } from '../state/workspace.js';
 import { formatGitHubIssue } from '../export/github-issue.js';
 import { runValidationSuite } from '../validation/registry.js';
 import '../components/AiAdvisor.js';
-import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
+import { escapeHtml, escapeAttr, safeUrl } from '../utils/escape-html.js';
 import { renderRoleGuidance as renderRoleGuidanceDetail } from '../roles/render-role-guidance.js';
 import { profileStore } from '../state/profile.js';
 import { FEATURES } from '../state/features.js';
@@ -245,7 +245,7 @@ function renderRuleGuidance(g) {
       ${g.verification?.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; margin-top: var(--space-2);">Verification</p><ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${list(g.verification)}</ul>` : ''}
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">
         ${g.curated ? 'Curated Workbench guidance' : 'Generic Workbench guidance'} &bull;
-        Source: ${p.sourceUrl ? `<a href="${escapeAttr(p.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.source)}</a>` : escapeHtml(p.source || 'Workbench')}
+        Source: ${p.sourceUrl ? `<a href="${escapeAttr(safeUrl(p.sourceUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.source)}</a>` : escapeHtml(p.source || 'Workbench')}
         ${p.revision ? ` &bull; rev ${escapeHtml(p.revision)}` : ''} ${p.license ? ` &bull; ${escapeHtml(p.license)}` : ''}
       </div>
     </div>
@@ -270,7 +270,7 @@ function renderRetrievedGuidance(items) {
               Retrieved because: ${escapeHtml((g.retrievalReason || []).join('; '))}
             </div>
             <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-              Source: ${g.sourceUrl ? `<a href="${escapeAttr(g.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(g.source)}</a>` : escapeHtml(g.source)}
+              Source: ${g.sourceUrl ? `<a href="${escapeAttr(safeUrl(g.sourceUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(g.source)}</a>` : escapeHtml(g.source)}
               &bull; ${escapeHtml(g.framework || 'framework-neutral')} &bull; ${escapeHtml(g.license)}${g.revision ? ` &bull; ${escapeHtml(g.revision)}` : ''}
             </div>
           </li>
