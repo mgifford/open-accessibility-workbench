@@ -29,50 +29,47 @@ export class AiAdvisor extends HTMLElement {
     const s = aiConsentStore.state;
     const webgpu = AiConsentStore.webgpuAvailable();
 
+    // Flag-off build never has a runtime, so it always shows the informational
+    // gate — even for a user whose consent persisted from an older build.
+    if (!FEATURES.aiModelRuntime) { this.renderConsentGate(webgpu); return; }
     if (!s.enabled) { this.renderConsentGate(webgpu); return; }
-    if (FEATURES.aiModelRuntime) { this.renderRuntimePanel(s, webgpu); return; }
-    this.renderScaffoldedPanel(s);
+    this.renderRuntimePanel(s, webgpu);
   }
 
   renderConsentGate(webgpu) {
     const runtime = FEATURES.aiModelRuntime;
+
+    // Flag-off build: be unambiguous that AI drafting cannot run here. Do NOT
+    // offer an "Enable" that only flips to an inert "Enabled" state — that reads
+    // as if something happened. State it plainly and note it is planned.
+    if (!runtime) {
+      this.innerHTML = `
+        <div class="card">
+          <h3 style="font-weight: 700; font-size: var(--font-size-base);">Local AI advisor</h3>
+          <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: var(--space-2) 0;">
+            <strong>AI drafting is not available in this build.</strong> This deployment ships no on-device model, so there is nothing to enable or download here.
+          </p>
+          <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin: var(--space-2) 0;">
+            On-device drafting is planned for a later release (it would run entirely in your browser — your report would never be uploaded). The deterministic guidance on this task works fully without it.
+          </p>
+        </div>`;
+      return;
+    }
+
     this.innerHTML = `
       <div class="card">
         <h3 style="font-weight: 700; font-size: var(--font-size-base);">Optional: Local AI advisor</h3>
         <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); white-space: pre-line; margin: var(--space-2) 0;">${escapeHtml(CONSENT_TEXT)}</p>
         <ul style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-left: var(--space-4);">
-          <li>${runtime ? 'Model' : 'Planned model'}: ${escapeHtml(MODEL_INFO.id)} (${escapeHtml(MODEL_INFO.quantization)}, ~${MODEL_INFO.approxDownloadMB} MB).</li>
+          <li>Model: ${escapeHtml(MODEL_INFO.id)} (${escapeHtml(MODEL_INFO.quantization)}, ~${MODEL_INFO.approxDownloadMB} MB).</li>
           <li>WebGPU on this device: ${webgpu ? 'available' : 'not available (a slower WASM fallback would be used where practical)'}.</li>
-          ${runtime
-            ? '<li>Inference runs entirely on your device — your report is never sent anywhere. Only the model weights are downloaded, from the host you choose.</li>'
-            : '<li><strong>This build does not download a separate model.</strong> The advisor composes structured, on-device guidance from the deterministic analysis; a downloadable local model is planned for a later release.</li>'}
+          <li>Inference runs entirely on your device — your report is never sent anywhere. Only the model weights are downloaded, from the host you choose.</li>
           <li>The deterministic guidance on this task works with or without AI.</li>
         </ul>
         <button type="button" class="btn btn-secondary" id="ai-enable-btn" style="margin-top: var(--space-3);">Enable local AI</button>
       </div>`;
     const btn = this.querySelector('#ai-enable-btn');
     if (btn) btn.addEventListener('click', () => aiConsentStore.enable());
-  }
-
-  renderScaffoldedPanel(s) {
-    this.innerHTML = `
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: var(--space-2);">
-          <h3 style="font-weight: 700; font-size: var(--font-size-base);">Local AI advisor</h3>
-          <span class="badge badge-medium">${escapeHtml(statusLabel(s.status))}</span>
-        </div>
-        <div id="ai-advisor-status" role="status" aria-live="polite" style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: var(--space-2) 0;">
-          ${escapeHtml(s.message || 'Enabled. This build composes structured guidance on-device; no separate model is downloaded.')}
-        </div>
-        <div style="display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2);">
-          <button type="button" class="btn btn-secondary" id="ai-disable-btn">Disable local AI</button>
-        </div>
-        <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">
-          AI contributions are optional and clearly labelled. If anything fails, the deterministic guidance on this task remains available.
-        </p>
-      </div>`;
-    const btn = this.querySelector('#ai-disable-btn');
-    if (btn) btn.addEventListener('click', () => aiConsentStore.disable());
   }
 
   renderRuntimePanel(s, webgpu) {

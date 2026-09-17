@@ -22,21 +22,17 @@ test('AI advisor is consent-gated and downloads nothing on load', async ({ page 
   await page.locator('article.card a[href^="#/task/"]').first().click();
   await expect(page).toHaveURL(/#\/task\//);
 
-  // The advisor shows the consent gate, not a running model.
+  // The default build ships no on-device runtime (VITE_AI_RUNTIME unset), so the
+  // advisor is honest that drafting is not available here and offers nothing to
+  // enable or download. (A VITE_AI_RUNTIME=1 build shows the consent + download
+  // flow instead; that path is covered by the runtime unit tests.)
   const advisor = page.locator('ai-advisor');
-  await expect(advisor).toContainText('Local AI runs on this device');
-  await expect(advisor).toContainText(/not sent to a cloud AI service/i);
-  await expect(page.getByRole('button', { name: /Enable local AI/i })).toBeVisible();
+  await expect(advisor).toContainText(/AI drafting is not available in this build/i);
+  await expect(page.getByRole('button', { name: /Enable local AI/i })).toHaveCount(0);
 
-  // No model download happened just from loading the page/task.
+  // Nothing was downloaded just from loading the page/task.
   expect(modelRequests, `unexpected model requests: ${modelRequests.join(', ')}`).toHaveLength(0);
 
-  // Enabling shows lifecycle controls but STILL does not auto-download.
-  await page.getByRole('button', { name: /Enable local AI/i }).click();
-  await expect(advisor).toContainText(/No model has been downloaded yet|Enabled/i);
-  await expect(page.getByRole('button', { name: /Disable local AI/i })).toBeVisible();
-  expect(modelRequests, 'enabling consent must not trigger a download').toHaveLength(0);
-
-  // The deterministic guidance on the task is present with AI enabled or not.
+  // The deterministic guidance on the task is present regardless of AI.
   await expect(page.getByRole('heading', { name: 'Curated Guidance' })).toBeVisible();
 });
