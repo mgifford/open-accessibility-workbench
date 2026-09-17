@@ -2,6 +2,8 @@ import { workspaceStore } from '../state/workspace.js';
 import { profileStore } from '../state/profile.js';
 import { isTaskRelevantToProfile } from '../roles/route-task.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
+import { buildScanScope } from '../analysis/scan-scope.js';
+import { renderScanHeader, renderCommonPatterns } from './scan-header.js';
 
 export class ReportOverview extends HTMLElement {
   connectedCallback() {
@@ -228,6 +230,7 @@ export class ReportOverview extends HTMLElement {
     const relevantTasks = tasks.filter(t => isTaskRelevantToProfile(t, selectedCapabilities));
     const highestLeverageTasks = tasks.filter(t => t.leverage === 'very-high' || t.leverage === 'high').slice(0, 3);
     const highestUrgencyTasks = tasks.filter(t => t.urgency === 'critical' || t.urgency === 'high').slice(0, 3);
+    const scope = buildScanScope(workspaceStore.state);
 
     this.innerHTML = `
       <section>
@@ -240,6 +243,8 @@ export class ReportOverview extends HTMLElement {
           </div>
           <a href="#/tasks" class="btn btn-primary">View All Tasks (${tasks.length})</a>
         </div>
+
+        ${renderScanHeader(scope)}
 
         ${importNote ? `
         <p role="status" style="background: var(--color-brand-bg); color: var(--color-text-primary); border: 1px solid var(--color-border); border-left: 4px solid var(--color-brand-primary); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); margin-bottom: var(--space-4); font-size: var(--font-size-sm);">
@@ -270,6 +275,9 @@ export class ReportOverview extends HTMLElement {
             <div class="waterfall-label">Remediation Tasks</div>
           </div>
         </div>
+
+        <!-- Most common patterns (scale of the problem) -->
+        ${renderCommonPatterns(scope?.patterns)}
 
         <!-- Role Relevance Notice -->
         ${selectedCapabilities.length > 0 ? `
