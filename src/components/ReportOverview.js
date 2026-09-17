@@ -40,7 +40,9 @@ export class ReportOverview extends HTMLElement {
         duplicates: s.duplicates
       }));
     } else if (rawTotals) {
-      rows = Object.entries(rawTotals)
+      // Engine-agnostic page-summary totals: { engines: { <engine>: { failed } }, duplicateFindings }.
+      const engineTotals = rawTotals.engines || rawTotals;
+      rows = Object.entries(engineTotals)
         .filter(([, v]) => v && typeof v === 'object' && 'failed' in v)
         .map(([id, v]) => ({ label: id, failed: v.failed ?? 0, unique: undefined, duplicates: undefined }));
     }

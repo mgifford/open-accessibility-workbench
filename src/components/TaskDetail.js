@@ -2,7 +2,7 @@ import { workspaceStore } from '../state/workspace.js';
 import { formatGitHubIssue } from '../export/github-issue.js';
 import { runValidationSuite } from '../validation/registry.js';
 import '../components/AiAdvisor.js';
-import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
+import { escapeHtml, escapeAttr, safeUrl } from '../utils/escape-html.js';
 import { renderRoleGuidance as renderRoleGuidanceDetail } from '../roles/render-role-guidance.js';
 import { profileStore } from '../state/profile.js';
 import { FEATURES } from '../state/features.js';
@@ -82,6 +82,8 @@ export class TaskDetail extends HTMLElement {
             </div>
           </div>
 
+          ${renderEngineCorroboration(task)}
+
           <!-- Why this matters -->
           <div style="margin: var(--space-6) 0;">
             <h3 style="font-size: var(--font-size-base); font-weight: 700; color: var(--color-text-primary); margin-bottom: var(--space-2);">
@@ -131,10 +133,16 @@ export class TaskDetail extends HTMLElement {
           <!-- Observed Scanner Evidence -->
           <div style="margin-bottom: var(--space-6);">
             <h3 style="font-size: var(--font-size-base); font-weight: 700; margin-bottom: var(--space-2);">Observed Scanner Evidence</h3>
-            <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-bottom: var(--space-1);">Locator:</p>
-            <pre class="code-block" style="margin-bottom: var(--space-2);"><code>${escapeHtml(task.representativeLocator)}</code></pre>
-            <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-bottom: var(--space-1);">Rendered DOM Snippet:</p>
-            <pre class="code-block"><code>${escapeHtml(task.representativeHtml)}</code></pre>
+            ${task.evidenceLevel === 'rule-only' ? `
+              <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); background-color: var(--color-bg-subtle); padding: var(--space-3); border-radius: var(--radius-md);">
+                This finding comes from a page-level summary CSV, which reports <strong>which rule failed on each page</strong> but not the failing element. There is no locator or DOM snippet to show. To get element-level evidence (selectors and HTML), load the scan's detailed <code>report.json</code>.
+              </p>
+            ` : `
+              <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-bottom: var(--space-1);">Locator:</p>
+              <pre class="code-block" style="margin-bottom: var(--space-2);"><code>${escapeHtml(task.representativeLocator)}</code></pre>
+              <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-bottom: var(--space-1);">Rendered DOM Snippet:</p>
+              <pre class="code-block"><code>${escapeHtml(task.representativeHtml)}</code></pre>
+            `}
           </div>
 
           <!-- Remediation pattern (structural placeholders — NOT a finished fix) -->
@@ -231,6 +239,35 @@ export class TaskDetail extends HTMLElement {
  * distinct from the task's own remediation blueprint — and never silently
  * becomes the recommendation.
  */
+/**
+ * Renders which scan engines flagged this task and how much to trust it. axe is
+ * authoritative (industry standard, low false positives, present in every scan
+ * and Oobee's default engine); a finding only a supplementary engine reported is
+ * shown as needing confirmation. Only rendered when the task carries engine
+ * provenance (open-scans multi-engine CSV / JSON); silent otherwise.
+ */
+function renderEngineCorroboration(task) {
+  const engines = Array.isArray(task.engines) ? task.engines : [];
+  if (engines.length === 0) return '';
+  const authoritative = task.authoritative === true;
+  const others = engines.filter(e => e !== 'axe');
+
+  const trustNote = authoritative
+    ? (others.length
+        ? `Reported by <strong>axe</strong> and corroborated by ${escapeHtml(others.join(', '))}.`
+        : `Reported by <strong>axe</strong> (the authoritative engine).`)
+    : `Reported only by ${escapeHtml(engines.join(', '))} — <strong>not by axe</strong>. Treat as needing confirmation before acting.`;
+
+  const bg = authoritative ? 'var(--color-bg-subtle)' : 'var(--color-urgency-medium-bg)';
+  const border = authoritative ? 'var(--color-border)' : 'var(--color-urgency-medium)';
+  return `
+    <div style="margin: var(--space-4) 0; padding: var(--space-3); background-color: ${bg}; border-left: 4px solid ${border}; border-radius: var(--radius-sm);">
+      <span style="font-size: var(--font-size-xs); text-transform: uppercase; font-weight: 700; color: var(--color-text-secondary);">Engine agreement</span>
+      <p style="font-size: var(--font-size-sm); margin-top: var(--space-1);">${trustNote}</p>
+    </div>
+  `;
+}
+
 /** Renders curated rule guidance (decisions/implementation/verification) with provenance. */
 function renderRuleGuidance(g) {
   if (!g) return '';
@@ -245,7 +282,7 @@ function renderRuleGuidance(g) {
       ${g.verification?.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; margin-top: var(--space-2);">Verification</p><ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${list(g.verification)}</ul>` : ''}
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">
         ${g.curated ? 'Curated Workbench guidance' : 'Generic Workbench guidance'} &bull;
-        Source: ${p.sourceUrl ? `<a href="${escapeAttr(p.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.source)}</a>` : escapeHtml(p.source || 'Workbench')}
+        Source: ${p.sourceUrl ? `<a href="${escapeAttr(safeUrl(p.sourceUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.source)}</a>` : escapeHtml(p.source || 'Workbench')}
         ${p.revision ? ` &bull; rev ${escapeHtml(p.revision)}` : ''} ${p.license ? ` &bull; ${escapeHtml(p.license)}` : ''}
       </div>
     </div>
@@ -270,7 +307,7 @@ function renderRetrievedGuidance(items) {
               Retrieved because: ${escapeHtml((g.retrievalReason || []).join('; '))}
             </div>
             <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-              Source: ${g.sourceUrl ? `<a href="${escapeAttr(g.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(g.source)}</a>` : escapeHtml(g.source)}
+              Source: ${g.sourceUrl ? `<a href="${escapeAttr(safeUrl(g.sourceUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(g.source)}</a>` : escapeHtml(g.source)}
               &bull; ${escapeHtml(g.framework || 'framework-neutral')} &bull; ${escapeHtml(g.license)}${g.revision ? ` &bull; ${escapeHtml(g.revision)}` : ''}
             </div>
           </li>

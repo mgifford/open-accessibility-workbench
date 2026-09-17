@@ -74,6 +74,10 @@ export function buildRemediationTasks(clusters = [], hypotheses = [], totalPages
     if (levDiff !== 0) return levDiff;
     const urgDiff = (urgencyRank[b.urgency] || 0) - (urgencyRank[a.urgency] || 0);
     if (urgDiff !== 0) return urgDiff;
+    // axe is authoritative: float axe-backed tasks above those only a
+    // supplementary engine reported, when leverage and urgency tie.
+    const authDiff = (b.authoritative ? 1 : 0) - (a.authoritative ? 1 : 0);
+    if (authDiff !== 0) return authDiff;
     return a.id.localeCompare(b.id);
   });
 }
@@ -161,6 +165,16 @@ function buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, 
     || 'ws';
   const id = `TASK-${wsId}-${family}-${shortHash(memberKeys.join('|'))}`;
 
+  // Engine corroboration. axe is authoritative (industry standard, low false
+  // positives, present in every scan and Oobee's default engine): a finding axe
+  // reported is trusted; one only a supplementary engine reported needs
+  // confirmation. `evidenceLevel` reflects whether any observation carried real
+  // element evidence — rule-only findings (from the summary CSV) say so honestly.
+  const engines = [...new Set(observations.map(o => o.provenance?.scanner).filter(Boolean))].sort();
+  const authoritative = observations.some(o => o.provenance?.authoritative === true) || engines.includes('axe');
+  const hasElementEvidence = observations.some(o => (o.evidence?.renderedHtml || '').trim() !== '' || (o.evidence?.locator || '').trim() !== '');
+  const evidenceLevel = hasElementEvidence ? 'element' : 'rule-only';
+
   return {
     id,
     title,
@@ -171,6 +185,9 @@ function buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, 
     upstreamPatternId: primary.upstreamPatternId,
     consolidated: isConsolidated,
     patternClusterIds: clusters.map(c => c.id),
+    engines,
+    authoritative,
+    evidenceLevel,
     wcag,
     urgency,
     leverage,

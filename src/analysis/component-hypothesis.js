@@ -33,7 +33,11 @@ export function buildComponentHypotheses(patternClusters, totalPagesInScan = 1) 
   // per-occurrence upstream pattern ids differ.
   const groups = new Map();
   for (const cluster of patternClusters) {
-    const key = componentKey(cluster);
+    // A component hypothesis is a structural inference. Rule-only clusters (from
+    // a summary CSV: no locator, no HTML) carry no structure to compare, so they
+    // must NOT be merged — otherwise every rule on a page collapses into one
+    // bogus "shared component". Give each a unique key so it stays standalone.
+    const key = isRuleOnlyCluster(cluster) ? `rule-only::${cluster.id}` : componentKey(cluster);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(cluster);
   }
@@ -45,6 +49,20 @@ export function buildComponentHypotheses(patternClusters, totalPagesInScan = 1) 
     hypotheses.push(describeComponent(clusters, totalPagesInScan, idx));
   }
   return hypotheses;
+}
+
+/**
+ * A cluster is rule-only when it has neither a locator nor rendered HTML to
+ * compare — i.e. it came from a page-level summary CSV that names the failing
+ * rule per page but not the element. Such clusters have no structural basis for
+ * a component hypothesis.
+ */
+function isRuleOnlyCluster(cluster) {
+  const loc = (cluster.representativeLocator || '').trim();
+  const html = (cluster.representativeHtml || '').trim();
+  if (loc || html) return false;
+  const obs = cluster.observations || [];
+  return obs.length === 0 || obs.every(o => (o.evidence?.evidenceLevel === 'rule-only'));
 }
 
 /**
