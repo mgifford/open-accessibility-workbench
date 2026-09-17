@@ -7,6 +7,8 @@ import { renderRoleGuidance as renderRoleGuidanceDetail } from '../roles/render-
 import { profileStore } from '../state/profile.js';
 import { FEATURES } from '../state/features.js';
 import '../components/HandoffBuilder.js';
+import { patternFingerprintOf, occurrenceFingerprintOf } from '../analysis/fingerprints.js';
+import { renderFingerprint, renderFingerprintNote } from './fingerprint.js';
 
 export class TaskDetail extends HTMLElement {
   constructor() {
@@ -75,6 +77,7 @@ export class TaskDetail extends HTMLElement {
               <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-1);">
                 Rule: <code>${escapeHtml(task.ruleId)}</code> (WCAG: ${escapeHtml(task.wcag.join(', ')) || 'N/A'})
               </div>
+              ${renderFingerprint(patternFingerprintOf(task), { label: 'Pattern fingerprint' })}
             </div>
             <div style="display: flex; gap: var(--space-2);">
               <span class="badge badge-${escapeAttr(task.urgency)}">Urgency: ${escapeHtml(task.urgency)}</span>
@@ -142,7 +145,9 @@ export class TaskDetail extends HTMLElement {
               <pre class="code-block" style="margin-bottom: var(--space-2);"><code>${escapeHtml(task.representativeLocator)}</code></pre>
               <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-bottom: var(--space-1);">Rendered DOM Snippet:</p>
               <pre class="code-block"><code>${escapeHtml(task.representativeHtml)}</code></pre>
+              ${renderFingerprint(occurrenceFingerprintOf((task.observations || [])[0]), { label: 'Representative occurrence' })}
             `}
+            ${patternFingerprintOf(task) || occurrenceFingerprintOf((task.observations || [])[0]) ? renderFingerprintNote() : ''}
           </div>
 
           <!-- Remediation pattern (structural placeholders — NOT a finished fix) -->
