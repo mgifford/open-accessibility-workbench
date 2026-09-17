@@ -60,33 +60,48 @@ _Last updated: 2026-09-01._
 
 ## Scaffolded 🟡
 
-**Optional local AI advisor + on-device model runtime (Phases 11–12, 15)**
+**Optional local AI advisor + capability-driven providers (Phases 11–12, 15–16)**
 - What exists and is **built**: the consent gate, prompt construction, a strict
   untrusted-data-safe response processor, invention checks (no fabricated
-  names/alt/colours/filenames), a bounded validation loop, **and a real on-device
-  model runtime** (Phase 15) — transformers.js loading a small model with genuine
-  download progress, cancel, WebGPU/WASM inference, model-source choice
-  (Hugging Face or a GitHub release), disposal, and AI output presented as a
-  clearly-labelled **draft** behind the validation checks.
-- **Why still 🟡:** the runtime is **build-gated** (`VITE_AI_RUNTIME=1`) and OFF in
-  the default/deployed build, which tree-shakes the ~100 MB dependency out
-  entirely (the shipped build is honest that it downloads no model). It stays
-  scaffolded until real model load + inference are **verified on WebGPU-capable
-  hardware** and the model weights are hosted (see Planned). The wiring is
-  unit-tested with a mocked library; the download path was confirmed to start
-  against Hugging Face. Deterministic guidance on every task works with AI on or
-  off. See [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md).
+  names/alt/colours/filenames), a bounded validation loop, and — since Phase 16 —
+  a **capability-driven provider abstraction** (ADR 0001) that routes across
+  several AI backends behind one interface, chosen by probed capability and never
+  by browser brand:
+  - a **browser Prompt API** provider (`window.LanguageModel` / Gemini Nano) that
+    needs no dependency, no weights we host, and no build flag;
+  - the **transformers.js** on-device model runtime (Phase 15) — genuine download
+    progress, cancel, WebGPU/WASM inference, model-source choice (Hugging Face or
+    a GitHub release), disposal;
+  - an always-available **deterministic** floor.
+  Every route's output passes the same invention + validation gate and is shown
+  as a clearly-labelled **draft**.
+- **Why still 🟡:** the *transformers.js* route is **build-gated**
+  (`VITE_AI_RUNTIME=1`) and OFF in the default/deployed build, which tree-shakes
+  the ~100 MB dependency out entirely (the shipped build downloads no model from
+  us). It stays scaffolded until real model load + inference are **verified on
+  WebGPU-capable hardware** and the weights are hosted (see Planned). The browser
+  Prompt API route needs none of that, but is only exercised where a browser
+  actually exposes the API. Wiring is unit-tested with mocked runtimes; the
+  transformers download path was confirmed to start against Hugging Face.
+  Deterministic guidance on every task works with AI on or off. See
+  [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md) and
+  [decisions/0001-capability-driven-browser-ai.md](decisions/0001-capability-driven-browser-ai.md).
 
 ---
 
 ## Planned ⬜
 
-- **Verify + enable the AI model runtime** — the runtime is built (see Scaffolded)
-  but not enabled in the deployed build. Remaining: verify real model load +
-  inference on WebGPU hardware, publish the model weights as a GitHub release
-  asset for the non-Hugging-Face source, decide the deploy story for the ~100 MB
-  AI build (it must not bloat the default Pages deploy), then flip
-  `VITE_AI_RUNTIME=1` for an AI-enabled build.
+- **Verify + enable the transformers.js model runtime** — this route is built
+  (see Scaffolded) but not enabled in the deployed build. Remaining: verify real
+  model load + inference on WebGPU hardware, publish the model weights as a GitHub
+  release asset for the non-Hugging-Face source, decide the deploy story for the
+  ~100 MB AI build (it must not bloat the default Pages deploy), then flip
+  `VITE_AI_RUNTIME=1` for an AI-enabled build. (The browser Prompt API route needs
+  none of this — it is already live where a browser exposes the API.)
+- **GitHub Pages COOP/COEP path** — decide whether to keep the transformers.js
+  route WebGPU-only on Pages (single-threaded; no headers needed) or add a
+  service-worker header shim / a static Hugging Face Space to unlock
+  multi-threaded WASM. Documented in ADR 0001; not yet chosen.
 - **Formal manual accessibility audit** against the full WCAG 2.2 AA
   success-criteria set, and a **verified screen-reader pass** on real AT
   (NVDA/JAWS/VoiceOver/Orca/TalkBack). Prerequisites for any conformance claim —
@@ -107,5 +122,9 @@ engine, role routing, and deterministic remediation. Phases 7–9 added exports,
 standalone-detector groundwork, and source-context hardening. Phases 10–12 added
 local retrieval and the (scaffolded) AI advisor with a deterministic validation
 loop. Phase 13 added offline, large-data, and security hardening. Phase 14 added
-the regression and accessibility QA described above. This document supersedes the
-brief per-phase notes; treat the status markers above as current truth.
+the regression and accessibility QA described above. Phase 15 built the real
+on-device transformers.js runtime (build-gated OFF). Phase 16 replaced the single
+hard-coded runtime with the capability-driven provider abstraction (ADR 0001):
+browser Prompt API → transformers.js → deterministic, same validation gate for
+all. This document supersedes the brief per-phase notes; treat the status markers
+above as current truth.
