@@ -4,6 +4,8 @@ import { routeTaskForProfile } from '../roles/route-task.js';
 import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
 import { taskStatusStore, TASK_STATUSES, TASK_STATUS_LABELS } from '../state/task-status.js';
 import { renderRoleGuidance } from '../roles/render-role-guidance.js';
+import { buildScanScope } from '../analysis/scan-scope.js';
+import { renderScanHeader } from './scan-header.js';
 
 /** Decision concern a remediation family requires (mirrors route-task.js). */
 const DECISION_CONCERN = {
@@ -78,9 +80,12 @@ export class TaskList extends HTMLElement {
     const hiddenCount = tasks.length - filtered.length;
 
     const statusCounts = taskStatusStore.summary(tasks.map(t => t.id));
+    const scope = buildScanScope(workspaceStore.state);
 
     this.innerHTML = `
       <section>
+        ${renderScanHeader(scope, { compact: true })}
+
         <div class="card-header">
           <div>
             <h2 class="card-title" style="font-size: var(--font-size-2xl);">Remediation Tasks</h2>

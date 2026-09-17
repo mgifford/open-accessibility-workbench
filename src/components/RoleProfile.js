@@ -1,21 +1,29 @@
 import { profileStore } from '../state/profile.js';
+import { workspaceStore } from '../state/workspace.js';
 import { CAPABILITY_OPTIONS } from '../roles/capability-profile.js';
+import { buildScanScope } from '../analysis/scan-scope.js';
+import { renderScanHeader } from './scan-header.js';
 
 export class RoleProfile extends HTMLElement {
   connectedCallback() {
     this.unsubscribe = profileStore.subscribe(() => this.render());
+    this.unsubscribeWorkspace = workspaceStore.subscribe(() => this.render());
     this.render();
   }
 
   disconnectedCallback() {
     if (this.unsubscribe) this.unsubscribe();
+    if (this.unsubscribeWorkspace) this.unsubscribeWorkspace();
   }
 
   render() {
     const { selectedCapabilities } = profileStore.state;
+    const scope = buildScanScope(workspaceStore.state);
 
     this.innerHTML = `
-      <section class="card">
+      <section>
+      ${renderScanHeader(scope, { compact: true })}
+      <div class="card">
         <h2 class="card-title" style="font-size: var(--font-size-2xl);">Capability & Role Profile</h2>
         <p style="color: var(--color-text-secondary); margin-bottom: var(--space-6);">
           Select the areas you have the ability to modify or review. The Workbench will tailor task views and handoff recommendations to your capabilities.
@@ -42,6 +50,7 @@ export class RoleProfile extends HTMLElement {
             <a href="#/tasks" class="btn btn-primary">View Matched Tasks</a>
           </div>
         </form>
+      </div>
       </section>
     `;
 

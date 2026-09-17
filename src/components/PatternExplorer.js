@@ -1,5 +1,13 @@
 import { workspaceStore } from '../state/workspace.js';
 import { escapeHtml, escapeAttr, safeUrl } from '../utils/escape-html.js';
+import { buildScanScope, rankPatternsByStrength, patternStrength } from '../analysis/scan-scope.js';
+import { renderScanHeader } from './scan-header.js';
+
+const STRENGTH_BADGE = {
+  strong: { label: 'Strong pattern', cls: 'badge-high' },
+  moderate: { label: 'Moderate pattern', cls: 'badge-medium' },
+  isolated: { label: 'Isolated', cls: 'badge-low' }
+};
 
 export class PatternExplorer extends HTMLElement {
   connectedCallback() {
@@ -19,19 +27,26 @@ export class PatternExplorer extends HTMLElement {
       return;
     }
 
+    const scope = buildScanScope(workspaceStore.state);
+    // Highest-confidence recurring patterns lead (strong → moderate → isolated).
+    const orderedClusters = rankPatternsByStrength(clusters);
+
     this.innerHTML = `
       <section>
         <div class="card-header">
           <div>
             <h2 class="card-title" style="font-size: var(--font-size-2xl);">Pattern Explorer</h2>
             <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-              ${clusters.length} recurring structural patterns identified across scanned pages.
+              ${clusters.length} recurring structural patterns, strongest first — patterns that recur across many pages are the highest-confidence signal of a shared, fixable cause.
             </p>
           </div>
         </div>
 
+        ${renderScanHeader(scope, { compact: true })}
+
         <div style="display: flex; flex-direction: column; gap: var(--space-6);">
-          ${clusters.map(c => {
+          ${orderedClusters.map(c => {
+            const strength = STRENGTH_BADGE[patternStrength(c)];
             // A component hypothesis may span several pattern clusters; match on
             // any member so every member pattern shows its component relationship.
             const hyp = hypotheses.find(
@@ -46,7 +61,8 @@ export class PatternExplorer extends HTMLElement {
                       ${c.upstreamPatternId ? `Authoritative Upstream ID: <code>${escapeHtml(c.upstreamPatternId)}</code>` : 'Synthesized DOM cluster'}
                     </div>
                   </div>
-                  <div style="display: flex; gap: var(--space-2);">
+                  <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
+                    <span class="badge ${strength.cls}" title="Confidence this is a recurring pattern, based on how many pages it affects">${strength.label}</span>
                     <span class="badge badge-high">${c.pagesCount} ${c.pagesCount === 1 ? 'page' : 'pages'}</span>
                     <span class="badge badge-medium">${c.occurrencesCount} ${c.occurrencesCount === 1 ? 'occurrence' : 'occurrences'}</span>
                   </div>

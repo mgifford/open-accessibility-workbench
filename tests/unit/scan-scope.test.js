@@ -1,7 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  hostnameOf, collectPageUrls, rankDomains, scaleSummary, commonPatterns, buildScanScope
+  hostnameOf, collectPageUrls, rankDomains, scaleSummary, commonPatterns, buildScanScope,
+  patternStrength, rankPatternsByStrength
 } from '../../src/analysis/scan-scope.js';
 
 describe('scan-scope: domain + scale derivation', () => {
@@ -64,6 +65,27 @@ describe('scan-scope: domain + scale derivation', () => {
     // Same page count (5), so higher occurrences (t2) wins the tie.
     assert.equal(patterns[0].taskId, 't2');
     assert.equal(patterns[1].taskId, 't1');
+  });
+
+  test('patternStrength bands by reach', () => {
+    assert.equal(patternStrength({ pagesCount: 3 }), 'strong');
+    assert.equal(patternStrength({ pagesCount: 1, pagesPercentage: 60 }), 'strong'); // majority of pages
+    assert.equal(patternStrength({ pagesCount: 2 }), 'moderate');
+    assert.equal(patternStrength({ pagesCount: 1, pagesPercentage: 10 }), 'isolated');
+    assert.equal(patternStrength({}), 'isolated');
+  });
+
+  test('rankPatternsByStrength leads with strong, then pages, then occurrences; no mutation', () => {
+    const clusters = [
+      { id: 'iso', pagesCount: 1, pagesPercentage: 10, occurrencesCount: 9 },
+      { id: 'strongA', pagesCount: 4, pagesPercentage: 80, occurrencesCount: 4 },
+      { id: 'mod', pagesCount: 2, pagesPercentage: 40, occurrencesCount: 2 },
+      { id: 'strongB', pagesCount: 4, pagesPercentage: 80, occurrencesCount: 10 }
+    ];
+    const before = clusters.map(c => c.id);
+    const ranked = rankPatternsByStrength(clusters).map(c => c.id);
+    assert.deepEqual(ranked, ['strongB', 'strongA', 'mod', 'iso']); // strongB has more occurrences than strongA
+    assert.deepEqual(clusters.map(c => c.id), before); // input untouched
   });
 
   test('buildScanScope returns null when nothing is loaded', () => {
