@@ -2,6 +2,22 @@ import { workspaceStore } from '../state/workspace.js';
 import { exportTasksToJson } from '../export/json.js';
 import { exportTasksToJsonLd } from '../export/jsonld.js';
 import { exportTasksToMarkdown } from '../export/markdown.js';
+import { escapeHtml } from '../utils/escape-html.js';
+
+/**
+ * The three whole-document export formats. `title` is the card heading; the
+ * preview shows the COMPLETE document (scrollable), and Download / Copy act on
+ * the same full text — nothing is truncated.
+ *
+ * Note on the JSON label: the task-level JSON is honest about NOT yet embedding
+ * observation-level record pointers (see src/export/json.js), so it is not
+ * described as "full provenance".
+ */
+const FORMATS = [
+  { key: 'md', title: 'Markdown Document', filename: 'remediation-plan.md', mime: 'text/markdown', build: (d) => exportTasksToMarkdown(d) },
+  { key: 'json', title: 'JSON (task-level)', filename: 'remediation-plan.json', mime: 'application/json', build: (d) => exportTasksToJson(d) },
+  { key: 'jsonld', title: 'JSON-LD (W3C linked data)', filename: 'remediation-plan.jsonld', mime: 'application/ld+json', build: (d) => exportTasksToJsonLd(d) }
+];
 
 export class ExportPanel extends HTMLElement {
   connectedCallback() {
@@ -17,13 +33,18 @@ export class ExportPanel extends HTMLElement {
     const { loaded, tasks, observations, sourceSummary } = workspaceStore.state;
 
     if (!loaded) {
-      this.innerHTML = `<section class="card"><p>Please load a report first.</p></section>`;
+      this.innerHTML = `
+        <section class="card">
+          <h2 class="card-title" style="font-size: var(--font-size-2xl);">Export Remediation Plan</h2>
+          <p style="color: var(--color-text-muted); margin: var(--space-4) 0;">Load an accessibility scan report to generate exportable remediation documents.</p>
+          <a href="#/import" class="btn btn-primary">Go to Import</a>
+        </section>`;
       return;
     }
 
-    const jsonExport = exportTasksToJson({ tasks, observations, sourceSummary });
-    const jsonLdExport = exportTasksToJsonLd({ tasks, observations, sourceSummary });
-    const mdExport = exportTasksToMarkdown({ tasks, observations, sourceSummary });
+    const data = { tasks, observations, sourceSummary };
+    // Build each full document once; Download, Copy, and the preview all use it.
+    this._docs = Object.fromEntries(FORMATS.map(f => [f.key, f.build(data)]));
 
     this.innerHTML = `
       <section>
@@ -31,67 +52,61 @@ export class ExportPanel extends HTMLElement {
           <div>
             <h2 class="card-title" style="font-size: var(--font-size-2xl);">Export Remediation Plan</h2>
             <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-              Export ${tasks.length} remediation tasks with full data provenance, ARRM role mappings, and verification criteria.
+              ${tasks.length} remediation ${tasks.length === 1 ? 'task' : 'tasks'} with ARRM role mappings, guidance provenance, and verification criteria. Each preview below is the complete document.
             </p>
           </div>
         </div>
 
         <div style="display: flex; flex-direction: column; gap: var(--space-6);">
-          <!-- Markdown Export Card -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Markdown Document</h3>
-              <button type="button" class="btn btn-secondary" id="download-md-btn">Download Markdown</button>
-            </div>
-            <pre class="code-block" style="max-height: 200px;"><code>${escapeHtml(mdExport.slice(0, 1000))}...</code></pre>
-          </div>
-
-          <!-- JSON Export Card -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">JSON Export (Full Provenance)</h3>
-              <button type="button" class="btn btn-secondary" id="download-json-btn">Download JSON</button>
-            </div>
-            <pre class="code-block" style="max-height: 200px;"><code>${escapeHtml(jsonExport.slice(0, 1000))}...</code></pre>
-          </div>
-
-          <!-- JSON-LD Export Card -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">JSON-LD (W3C Semantic Web)</h3>
-              <button type="button" class="btn btn-secondary" id="download-jsonld-btn">Download JSON-LD</button>
-            </div>
-            <pre class="code-block" style="max-height: 200px;"><code>${escapeHtml(jsonLdExport.slice(0, 1000))}...</code></pre>
-          </div>
+          ${FORMATS.map(f => this.renderCard(f, this._docs[f.key])).join('')}
         </div>
-      </section>
-    `;
+      </section>`;
 
-    this.setupListeners(jsonExport, jsonLdExport, mdExport);
+    this.setupListeners();
   }
 
-  setupListeners(jsonText, jsonLdText, mdText) {
-    const jsonBtn = this.querySelector('#download-json-btn');
-    const jsonLdBtn = this.querySelector('#download-jsonld-btn');
-    const mdBtn = this.querySelector('#download-md-btn');
+  renderCard(format, fullText) {
+    const bytes = new Blob([fullText]).size;
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">${escapeHtml(format.title)}</h3>
+          <div style="display: flex; gap: var(--space-2);">
+            <button type="button" class="btn btn-secondary" data-copy="${format.key}">Copy</button>
+            <button type="button" class="btn btn-primary" data-download="${format.key}">Download</button>
+          </div>
+        </div>
+        <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-bottom: var(--space-2);">
+          Complete document · <code>${escapeHtml(format.filename)}</code> · ${formatBytes(bytes)}
+        </p>
+        <pre class="code-block" tabindex="0" aria-label="${escapeHtml(format.title)} full document" style="max-height: 24em; overflow: auto;"><code>${escapeHtml(fullText)}</code></pre>
+        <span class="sr-only" role="status" data-status="${format.key}"></span>
+      </div>`;
+  }
 
-    if (jsonBtn) {
-      jsonBtn.addEventListener('click', () => {
-        downloadBlob(jsonText, 'remediation-plan.json', 'application/json');
-      });
-    }
+  setupListeners() {
+    this.querySelectorAll('[data-download]').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const f = FORMATS.find(x => x.key === btn.dataset.download);
+        if (f) downloadBlob(this._docs[f.key], f.filename, f.mime);
+      }));
 
-    if (jsonLdBtn) {
-      jsonLdBtn.addEventListener('click', () => {
-        downloadBlob(jsonLdText, 'remediation-plan.jsonld', 'application/ld+json');
-      });
-    }
-
-    if (mdBtn) {
-      mdBtn.addEventListener('click', () => {
-        downloadBlob(mdText, 'remediation-plan.md', 'text/markdown');
-      });
-    }
+    this.querySelectorAll('[data-copy]').forEach(btn =>
+      btn.addEventListener('click', async () => {
+        const key = btn.dataset.copy;
+        const status = this.querySelector(`[data-status="${key}"]`);
+        try {
+          await navigator.clipboard.writeText(this._docs[key]);
+          if (status) status.textContent = 'Copied the full document to the clipboard.';
+          const original = btn.textContent;
+          btn.textContent = 'Copied';
+          setTimeout(() => { btn.textContent = original; }, 1500);
+        } catch {
+          // Clipboard can be blocked (permissions, insecure context); the
+          // Download button and the visible preview remain available.
+          if (status) status.textContent = 'Copy was blocked by the browser. Use Download instead.';
+        }
+      }));
   }
 }
 
@@ -101,13 +116,17 @@ function downloadBlob(content, filename, type) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  // Some browsers require the anchor to be in the document for a synthetic click.
+  document.body.appendChild(a);
   a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 customElements.define('export-panel', ExportPanel);
