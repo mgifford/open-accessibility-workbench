@@ -1,9 +1,12 @@
 # In-Browser AI Architecture & Prompt Safety
 
 Open Accessibility Workbench includes an optional, privacy-first local AI
-enhancement layer running in a dedicated Web Worker. The real model runtime uses
-`@huggingface/transformers`, is **build-gated** (`VITE_AI_RUNTIME=1`), and is OFF
-in the default/deployed build — see the Phase 15 section below.
+enhancement layer. It routes across several providers by **probed capability,
+never browser brand** (see [ADR 0001](decisions/0001-capability-driven-browser-ai.md)):
+the browser's built-in on-device AI when exposed (no dependency, not build-gated),
+a build-gated `@huggingface/transformers` Web Worker (`VITE_AI_RUNTIME=1`, OFF in
+the default/deployed build), and an always-available deterministic floor. Every
+route passes the same invention + validation gate — see the sections below.
 
 ---
 
@@ -159,10 +162,49 @@ inputs, results, manualVerificationRequired }`, plus whether the final candidate
 differs from the first attempt. These checks do not prove accessibility;
 meaningfulness (alt text wording, link purpose) always requires human review.
 
+## Capability-Driven Provider Routing (ADR 0001)
+
+The single hard-coded runtime below (Phase 15) is now one of several providers
+behind a common interface, chosen by **probed capability, never browser brand**.
+See [decisions/0001-capability-driven-browser-ai.md](decisions/0001-capability-driven-browser-ai.md).
+
+- **Provider interface** (`src/ai/providers.js`): every provider exposes
+  `availability()`, a `generate()` that runs this repo's bounded validation loop,
+  and `close()`; browser/transformers providers add a disclosed `prepare()`
+  download. Implementations:
+  - **Browser Prompt API** (`createBrowserPromptProvider`) — the browser's
+    built-in on-device AI (`window.LanguageModel` / `ai.languageModel`, currently
+    Gemini Nano in Chromium). **No dependency, no download we host, no COOP/COEP
+    headers, and NOT behind `VITE_AI_RUNTIME`** — it is offered live once the user
+    consents.
+  - **transformers.js worker** (`createTransformersProvider`) — the Phase 15
+    runtime, still **build-gated behind `VITE_AI_RUNTIME`** and offered only when
+    WebGPU is usable.
+  - **Deterministic** (`deterministicProvider`) — always available; the floor.
+- **Capability probing** (`src/ai/browser-capabilities.js`): session-only probe of
+  the Prompt API (never calls `create()`) and a real WebGPU adapter gate
+  (`probeWebGpu`, with a device-memory refusal and a metered-connection warning).
+- **Routing** (`src/ai/router.js`): `browser-ready → browser-downloadable →
+  transformers (built + WebGPU) → deterministic`. A route is a *preference*, not a
+  promise — any route may reject at run time and the advisor falls down the list.
+- **Same gate for every route**: whatever provider generates a candidate, it
+  passes through `response-processor.js` (invention rejection) and
+  `validation-loop.js` (bounded validation) unchanged. Adding providers never
+  widened what output is trusted.
+
+### Deployment: GitHub Pages vs Hugging Face Spaces (COOP/COEP)
+Multi-threaded WASM / `SharedArrayBuffer` needs cross-origin isolation
+(COOP+COEP headers), which **GitHub Pages cannot set**. So on Pages the supported
+AI routes are: deterministic (always), the browser Prompt API (needs no headers),
+and — only in a `VITE_AI_RUNTIME` build — the transformers.js **WebGPU**
+(single-threaded) path. Multi-threaded WASM is not relied on there; a
+service-worker header shim or a static Hugging Face Space (which *can* set the
+headers) are the documented escape hatches. Full rationale in ADR 0001.
+
 ## On-Device Model Runtime (Phase 15)
 
-The real runtime that executes a model in the browser. It is **build-gated** and
-**OFF by default**.
+The transformers.js provider that executes a model in the browser. It is
+**build-gated** and **OFF by default**.
 
 ### Build gating
 - The runtime code (`src/ai/model-runtime.js`, the AI worker, and the
