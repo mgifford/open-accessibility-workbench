@@ -2,6 +2,8 @@ import { workspaceStore } from '../state/workspace.js';
 import { escapeHtml, escapeAttr, safeUrl } from '../utils/escape-html.js';
 import { buildScanScope, rankPatternsByStrength, patternStrength } from '../analysis/scan-scope.js';
 import { renderScanHeader } from './scan-header.js';
+import { patternFingerprintOf } from '../analysis/fingerprints.js';
+import { renderFingerprint, renderFingerprintNote } from './fingerprint.js';
 
 const STRENGTH_BADGE = {
   strong: { label: 'Strong pattern', cls: 'badge-high' },
@@ -30,6 +32,10 @@ export class PatternExplorer extends HTMLElement {
     const scope = buildScanScope(workspaceStore.state);
     // Highest-confidence recurring patterns lead (strong → moderate → isolated).
     const orderedClusters = rankPatternsByStrength(clusters);
+    // Fingerprints exist only when the source report carried them (open-scans
+    // JSON does; the rule-only summary CSV does not). Show the explainer only
+    // when at least one pattern actually has one.
+    const anyFingerprint = orderedClusters.some(c => patternFingerprintOf(c));
 
     this.innerHTML = `
       <section>
@@ -43,10 +49,12 @@ export class PatternExplorer extends HTMLElement {
         </div>
 
         ${renderScanHeader(scope, { compact: true })}
+        ${anyFingerprint ? renderFingerprintNote() : ''}
 
         <div style="display: flex; flex-direction: column; gap: var(--space-6);">
           ${orderedClusters.map(c => {
             const strength = STRENGTH_BADGE[patternStrength(c)];
+            const fingerprint = patternFingerprintOf(c);
             // A component hypothesis may span several pattern clusters; match on
             // any member so every member pattern shows its component relationship.
             const hyp = hypotheses.find(
@@ -60,6 +68,7 @@ export class PatternExplorer extends HTMLElement {
                     <div style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: var(--space-1);">
                       ${c.upstreamPatternId ? `Authoritative Upstream ID: <code>${escapeHtml(c.upstreamPatternId)}</code>` : 'Synthesized DOM cluster'}
                     </div>
+                    ${renderFingerprint(fingerprint, { label: 'Pattern fingerprint' })}
                   </div>
                   <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
                     <span class="badge ${strength.cls}" title="Confidence this is a recurring pattern, based on how many pages it affects">${strength.label}</span>
