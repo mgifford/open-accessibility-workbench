@@ -53,9 +53,25 @@ const routes = {
   `
 };
 
+/**
+ * Shows the report-dependent nav links (Overview, Patterns, Tasks, Roles,
+ * Export) only once a report is loaded; Import and About are always available.
+ * Before a report exists those views are empty dead-ends, so hiding their links
+ * keeps the navigation honest about what there is to review.
+ */
+function syncNav(loaded) {
+  document.querySelectorAll('nav.main-nav [data-requires-report]').forEach(li => {
+    li.hidden = !loaded;
+  });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   const router = new Router(routes, 'app-root');
   router.init();
+
+  // Gate the report-dependent nav links on whether a report is loaded.
+  syncNav(workspaceStore.state.loaded);
+  workspaceStore.subscribe((state) => syncNav(state.loaded));
 
   // When the user confirms/rejects/replaces/resets technology, rebuild the
   // loaded tasks (contexts, blueprints, guidance) without re-parsing the report.

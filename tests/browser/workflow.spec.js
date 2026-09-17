@@ -59,8 +59,14 @@ test('Phase 6/9 gate: tasks are reachable and a task can be inspected with AI di
 });
 
 test('Phase 1 keyboard: nav links are reachable and route change moves focus to main', async ({ page }) => {
+  // The report-dependent nav links (incl. Tasks) appear only once a report is
+  // loaded, so load one first, then drive the Tasks link with the keyboard.
+  await page.getByRole('button', { name: /Load Pattern-Reduction Demo/i }).click();
+  await expect(page).toHaveURL(/#\/overview/);
+
   // Activate the Tasks nav link with the keyboard.
   const tasksLink = page.getByRole('link', { name: 'Tasks', exact: true });
+  await expect(tasksLink).toBeVisible();
   await tasksLink.focus();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#\/tasks/);
