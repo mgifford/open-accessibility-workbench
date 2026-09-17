@@ -369,30 +369,29 @@ export class ReportLoader extends HTMLElement {
           scanId: 'oobee-csv', scanTitle: null, issueNumber: null, scanMetadata: null
         });
       } else if (detection.type === REPORT_TYPES.OPEN_SCANS_CSV) {
-        // Page-level summary CSV: no finding-level evidence, but real per-page
-        // and per-engine failure counts the overview can display truthfully.
+        // Multi-engine page-summary CSV. It carries no element evidence (no HTML
+        // or selectors), but each engine's `*_failed_rules` list is real,
+        // rule-level signal. We derive low-fidelity, rule-only observations from
+        // those lists so the CSV alone can produce remediation tasks (axe-backed
+        // tasks rank first; non-axe-only findings are marked lower-confidence),
+        // while still keeping the per-page/per-engine summary for the overview.
         const parsed = parseOpenScansReportCsv(detection.parsedData || content);
-        const sourceReport = makeSourceReport({
-          filename, system: detection.system, format: detection.format,
+        const enriched = enrichObservationsWithSignatures(parsed.observations);
+        const clusters = clusterPatternOccurrences(enriched, parsed.totalPages);
+        const hypotheses = buildComponentHypotheses(clusters, parsed.totalPages);
+        this.finishFindingLevel({
+          content, filename, overlapContent, opts,
+          system: detection.system, format: detection.format,
+          observations: enriched, clusters, hypotheses,
+          totalPages: parsed.totalPages,
+          rawTotals: summarizeCsvTotals(parsed.pages),
+          pageSummaries: parsed.pages,
+          engines: parsed.engines,
           scanId: String(parsed.pages[0]?.issueNumber || 'open-scans-csv'),
-          rawContent: typeof content === 'string' ? content : JSON.stringify(content)
+          scanTitle: parsed.pages[0]?.scanTitle || null,
+          issueNumber: parsed.pages[0]?.issueNumber || null,
+          scanMetadata: null
         });
-        const existingReports = workspaceStore.state.sourceReports || [];
-        const sourceReports = existingReports.some(r => r.id === sourceReport.id) ? existingReports : [...existingReports, sourceReport];
-        workspaceStore.setState({
-          loaded: true,
-          sourceSummary: {
-            system: detection.system, format: detection.format, filename,
-            scanId: sourceReport.scanId, scanTitle: parsed.pages[0]?.scanTitle || '',
-            totalPages: parsed.totalPages, granularity: 'page',
-            rawTotals: summarizeCsvTotals(parsed.pages), pageSummaries: parsed.pages,
-            sourceReportId: sourceReport.id
-          },
-          sourceReports, observations: [], clusters: [], hypotheses: [], tasks: [],
-          overlapData: null, summaryData: null, importNote: opts.note || null,
-          statusMessage: `${note}Summary CSV loaded (${parsed.totalPages} pages).`
-        });
-        window.location.hash = '#/overview';
       } else {
         this.showError(
           `The "${detection.type}" format is recognized but not yet supported for full ingestion in this view.\n\n` +
@@ -450,7 +449,7 @@ export class ReportLoader extends HTMLElement {
         system: a.system, format: a.format, filename,
         scanId: a.scanId, scanTitle: a.scanTitle, issueNumber: a.issueNumber,
         totalPages: a.totalPages, engines: a.engines || [],
-        rawTotals: a.rawTotals, pageSummaries: null, sourceReportId: sourceReport.id
+        rawTotals: a.rawTotals, pageSummaries: a.pageSummaries || null, sourceReportId: sourceReport.id
       },
       sourceReports,
       observations: a.observations,
@@ -513,13 +512,18 @@ export class ReportLoader extends HTMLElement {
  * for display. These are page-summary counts, not finding-level evidence.
  */
 function summarizeCsvTotals(pages = []) {
-  const sum = (key) => pages.reduce((acc, p) => acc + (p[key] || 0), 0);
-  return {
-    axe: { failed: sum('axeFailed'), passed: sum('axePassed') },
-    qualweb: { failed: sum('qualwebFailed') },
-    alfa: { failed: sum('alfaFailed') },
-    duplicateFindings: sum('duplicateFindings')
-  };
+  // Engine-agnostic: sum every engine the parser discovered (keys under
+  // page.engines) so a new scan engine appears with no code change here.
+  const byEngine = {};
+  let duplicateFindings = 0;
+  for (const p of pages) {
+    duplicateFindings += p.duplicateFindings || 0;
+    for (const [eng, data] of Object.entries(p.engines || {})) {
+      if (!byEngine[eng]) byEngine[eng] = { failed: 0 };
+      byEngine[eng].failed += data.failed || 0;
+    }
+  }
+  return { engines: byEngine, duplicateFindings };
 }
 
 customElements.define('report-loader', ReportLoader);

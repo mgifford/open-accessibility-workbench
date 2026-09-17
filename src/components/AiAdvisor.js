@@ -70,10 +70,33 @@ export class AiAdvisor extends HTMLElement {
     const s = aiConsentStore.state;
     const route = this._route || s.aiRoute || (FEATURES.aiModelRuntime ? 'transformers' : 'deterministic');
 
+    // The route already folds in both real capability AND the build flag:
+    // 'deterministic' means neither a built runtime nor a browser Prompt API is
+    // usable here. In that case, follow main's honest gate — say drafting is not
+    // available and offer nothing to enable (no inert "Enabled" state).
+    if (route === 'deterministic') { this.renderUnavailableGate(); return; }
+
     if (!s.enabled) { this.renderConsentGate(route); return; }
     if (route === 'browser-prompt' || route === 'browser-prompt-downloadable') { this.renderBrowserPanel(s, route); return; }
-    if (route === 'transformers') { this.renderRuntimePanel(s); return; }
-    this.renderScaffoldedPanel(s);
+    this.renderRuntimePanel(s);
+  }
+
+  /**
+   * Shown when no AI route is usable here (no browser Prompt API and no built
+   * transformers runtime). Be unambiguous that drafting cannot run — do NOT offer
+   * an "Enable" that only flips to an inert "Enabled" state.
+   */
+  renderUnavailableGate() {
+    this.innerHTML = `
+      <div class="card">
+        <h3 style="font-weight: 700; font-size: var(--font-size-base);">Local AI advisor</h3>
+        <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: var(--space-2) 0;">
+          <strong>AI drafting is not available in this build.</strong> This deployment ships no on-device model, so there is nothing to enable or download here.
+        </p>
+        <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin: var(--space-2) 0;">
+          On-device drafting is planned for a later release (it would run entirely in your browser — your report would never be uploaded). The deterministic guidance on this task works fully without it.
+        </p>
+      </div>`;
   }
 
   renderConsentGate(route) {
@@ -92,36 +115,12 @@ export class AiAdvisor extends HTMLElement {
             ? `<li>Model: ${escapeHtml(MODEL_INFO.id)} (${escapeHtml(MODEL_INFO.quantization)}, ~${MODEL_INFO.approxDownloadMB} MB), from the host you choose.</li>
                <li>WebGPU on this device: ${webgpu ? 'available' : 'not available'}. Inference runs entirely on your device — your report is never sent anywhere.</li>`
             : ''}
-          ${!browser && !transformers
-            ? `<li><strong>This build does not download a separate model.</strong> The advisor composes structured, on-device guidance from the deterministic analysis; a downloadable local model is planned for a later release.</li>`
-            : ''}
           <li>The deterministic guidance on this task works with or without AI.</li>
         </ul>
         <button type="button" class="btn btn-secondary" id="ai-enable-btn" style="margin-top: var(--space-3);">Enable local AI</button>
       </div>`;
     const btn = this.querySelector('#ai-enable-btn');
     if (btn) btn.addEventListener('click', () => aiConsentStore.enable());
-  }
-
-  renderScaffoldedPanel(s) {
-    this.innerHTML = `
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: var(--space-2);">
-          <h3 style="font-weight: 700; font-size: var(--font-size-base);">Local AI advisor</h3>
-          <span class="badge badge-medium">${escapeHtml(statusLabel(s.status))}</span>
-        </div>
-        <div id="ai-advisor-status" role="status" aria-live="polite" style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: var(--space-2) 0;">
-          ${escapeHtml(s.message || 'Enabled. This build composes structured guidance on-device; no separate model is downloaded.')}
-        </div>
-        <div style="display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2);">
-          <button type="button" class="btn btn-secondary" id="ai-disable-btn">Disable local AI</button>
-        </div>
-        <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">
-          AI contributions are optional and clearly labelled. If anything fails, the deterministic guidance on this task remains available.
-        </p>
-      </div>`;
-    const btn = this.querySelector('#ai-disable-btn');
-    if (btn) btn.addEventListener('click', () => aiConsentStore.disable());
   }
 
   renderBrowserPanel(s, route) {

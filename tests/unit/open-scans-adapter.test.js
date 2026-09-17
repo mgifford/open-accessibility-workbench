@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseOpenScansReportJson } from '../../src/adapters/open-scans/report-json.js';
 import { parseOpenScansOverlapJson } from '../../src/adapters/open-scans/overlap-json.js';
-import { parseOpenScansReportCsv } from '../../src/adapters/open-scans/report-csv.js';
+import { parseOpenScansReportCsv, discoverEngines } from '../../src/adapters/open-scans/report-csv.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,14 +87,47 @@ describe('Open Scans Adapter Contract', () => {
     assert.deepEqual(result.overlapEntries, []);
   });
 
-  test('correctly parses summary report.csv', () => {
+  test('correctly parses multi-engine summary report.csv', () => {
     const raw = fs.readFileSync(path.join(fixturesDir, 'report.csv'), 'utf8');
     const result = parseOpenScansReportCsv(raw);
 
     assert.equal(result.system, 'open-scans');
     assert.equal(result.granularity, 'page');
     assert.equal(result.totalPages, 2);
-    assert.equal(result.pages[0].axeFailed, 24);
-    assert.deepEqual(result.pages[0].axeFailedRules, ['color-contrast', 'link-name', 'region']);
+    // Engines discovered by column prefix, axe first (authoritative).
+    assert.equal(result.engines[0], 'axe');
+    assert.deepEqual([...result.engines].sort(), ['accesslint', 'alfa', 'axe', 'equal_access', 'qualweb']);
+    // Per-engine counts + rule lists live under page.engines[<engine>].
+    assert.equal(result.pages[0].engines.axe.failed, 24);
+    assert.deepEqual(result.pages[0].engines.axe.failedRules, ['color-contrast', 'link-name', 'region']);
+  });
+
+  test('discoverEngines finds engines by column prefix and puts axe first', () => {
+    const headers = ['submitted_url', 'alfa_failed', 'alfa_failed_rules', 'axe_failed', 'axe_failed_rules', 'qualweb_failed', 'duplicate_findings'];
+    assert.deepEqual(discoverEngines(headers), ['axe', 'alfa', 'qualweb']);
+  });
+
+  test('derives rule-only observations from failed_rules, tagging axe as authoritative', () => {
+    const raw = fs.readFileSync(path.join(fixturesDir, 'report.csv'), 'utf8');
+    const result = parseOpenScansReportCsv(raw);
+
+    // One observation per (page, engine, ruleId) across all engines.
+    assert.ok(result.observations.length >= 5, 'observations derived from failed_rules');
+
+    const axeObs = result.observations.filter(o => o.provenance.scanner === 'axe');
+    assert.ok(axeObs.length > 0);
+    for (const o of axeObs) {
+      assert.equal(o.provenance.authoritative, true, 'axe observations are authoritative');
+      // Rule-only: the CSV carries no element evidence, and none is invented.
+      assert.equal(o.evidence.renderedHtml, '');
+      assert.equal(o.evidence.locator, '');
+      assert.equal(o.evidence.evidenceLevel, 'rule-only');
+      assert.equal(o.classification.impact, null);
+      assert.equal(o.classification.impactSource, 'none');
+    }
+
+    const qualwebObs = result.observations.filter(o => o.provenance.scanner === 'qualweb');
+    assert.ok(qualwebObs.length > 0);
+    assert.equal(qualwebObs[0].provenance.authoritative, false, 'supplementary engines are not authoritative');
   });
 });

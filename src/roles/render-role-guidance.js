@@ -1,4 +1,4 @@
-import { escapeHtml } from '../utils/escape-html.js';
+import { escapeHtml, escapeAttr, safeUrl } from '../utils/escape-html.js';
 import { ARRM_METADATA } from './arrm.js';
 
 /**
@@ -30,7 +30,7 @@ export function renderRoleGuidance(roles = {}, { detailed = false } = {}) {
       provenance += ` &bull; WCAG: ${escapeHtml(roles.matchedSc.join(', '))}`;
     }
     provenance += ` &bull; snapshot ${escapeHtml(ARRM_METADATA.snapshotDate)} &bull; ${escapeHtml(ARRM_METADATA.license)}`;
-    provenance += ` &bull; <a href="${escapeHtml(ARRM_METADATA.sourceUrl)}" target="_blank" rel="noopener noreferrer">ARRM (draft)</a>`;
+    provenance += ` &bull; <a href="${escapeAttr(safeUrl(ARRM_METADATA.sourceUrl))}" target="_blank" rel="noopener noreferrer">ARRM (draft)</a>`;
   }
   provenance += '</div>';
 

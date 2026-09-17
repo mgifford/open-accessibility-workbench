@@ -28,6 +28,9 @@ function getWorker() {
     worker.onerror = (err) => {
       for (const [, h] of pending) h.reject(new Error(err.message || 'AI worker error'));
       pending.clear();
+      // A fatal worker error leaves the Worker unusable; drop the reference so
+      // the next call spawns a fresh one instead of hanging on a dead worker.
+      worker = null;
     };
   }
   return worker;
