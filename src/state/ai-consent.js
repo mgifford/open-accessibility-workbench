@@ -49,14 +49,34 @@ export const CONSENT_TEXT = [
   'Your accessibility report is not sent to a cloud AI service.'
 ].join('\n');
 
+/**
+ * Capability-aware consent notice (ADR 0001). The route decides the middle line
+ * — the first and last lines are stable so they always assure the user that AI
+ * is on-device and the report is never sent to a cloud service.
+ *
+ * @param {'browser-prompt'|'browser-prompt-downloadable'|'transformers'|'deterministic'|string} [route]
+ */
+export function consentText(route) {
+  const middle = {
+    'browser-prompt': "This browser has a built-in on-device AI; enabling uses it — no separate model is downloaded from us.",
+    'browser-prompt-downloadable': "This browser can provide a built-in on-device AI; if you enable it, the browser downloads its own model (disclosed before it starts).",
+    transformers: "A small local model can be downloaded from the host you choose and run on your device.",
+    deterministic: 'This build does not download a separate model; a downloadable local model is planned for a later release.'
+  }[route] || 'This build does not download a separate model; a downloadable local model is planned for a later release.';
+  return ['Local AI runs on this device.', middle, 'Your accessibility report is not sent to a cloud AI service.'].join('\n');
+}
+
 const STORAGE_KEY = 'oaw.aiConsent.v1';
 
 class AiConsentStore {
   constructor() {
     // status: 'disabled' | 'consented' | 'downloading' | 'ready' | 'error'
+    // aiRoute: which provider the capability router picked this session
+    //   (browser-prompt | browser-prompt-downloadable | transformers | deterministic).
+    //   Never persisted — capabilities are re-probed each session.
     this.state = {
       enabled: false, status: 'disabled', progress: 0, message: '',
-      device: null, error: null, modelSource: DEFAULT_MODEL_SOURCE
+      device: null, error: null, modelSource: DEFAULT_MODEL_SOURCE, aiRoute: null
     };
     this.listeners = new Set();
     this._load();
@@ -79,6 +99,9 @@ class AiConsentStore {
   _persist() {
     try { safeSet(STORAGE_KEY, JSON.stringify({ enabled: this.state.enabled, modelSource: this.state.modelSource })); } catch { /* ignore */ }
   }
+
+  /** Records the capability route chosen this session (not persisted). */
+  setRoute(route) { this.setState({ aiRoute: route || null }); }
 
   /** User selects where weights download from (persisted). */
   setModelSource(source) {
