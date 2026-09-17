@@ -281,12 +281,62 @@ pre.code-block {
   font-size: var(--font-size-sm);
 }
 
+/* Shared scan-scope header (domains + scale), reused across analysis views */
+.scan-header {
+  background-color: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.scan-header__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+.scan-header__label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.scan-header__domain {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  background-color: var(--color-brand-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-2);
+}
+.scan-header__domain--none {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  padding: 0;
+}
+.scan-header__more {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.scan-header__scale {
+  color: var(--color-text-secondary);
+}
+
 /* Forced Colors mode support */
 @media (forced-colors: active) {
   :focus-visible {
     outline: 3px solid Highlight;
   }
   .btn, .badge {
+    border: 1px solid ButtonText;
+  }
+  .scan-header__domain {
     border: 1px solid ButtonText;
   }
 }
