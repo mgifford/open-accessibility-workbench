@@ -43,10 +43,13 @@ export function remediationFamily(ruleId = '') {
 }
 
 export function buildRemediationTasks(clusters = [], hypotheses = [], totalPages = 1, userConfirmedTech = null, scanMetadata = null, workspaceId = null, rejectedTech = []) {
-  // Consolidate by (component, remediation-family). Clusters of a component that
-  // require the SAME implementation action merge into one task; clusters of the
-  // same component requiring a DIFFERENT action become separate tasks. Clusters
-  // with no multi-cluster component form their own family-scoped group.
+  // Consolidate by (rule, remediation-family): every cluster of the same rule is
+  // one unit of remediation work, regardless of how many structural components it
+  // spans. This prevents a single rule (e.g. focus-visible) from fragmenting into
+  // dozens of near-identical tasks when its findings carry no shared locator to
+  // group by — a common case for engines (QualWeb) that report rendered HTML but
+  // no CSS selector. The structural component hypotheses a rule spans are surfaced
+  // as evidence INSIDE the task, not used to split it.
   const clusterById = new Map(clusters.map(c => [c.id, c]));
   const componentOf = new Map(); // clusterId -> hypothesis (multi-cluster only)
   for (const hyp of hypotheses) {
@@ -57,15 +60,31 @@ export function buildRemediationTasks(clusters = [], hypotheses = [], totalPages
     }
   }
 
-  // Group key = component id (or standalone cluster id) + remediation family.
+  // Group key = rule id + remediation family. (Family already unifies rules that
+  // need the same action across engines — e.g. region/landmark/heading-order all
+  // map to "structure" — so those consolidate together; a rule with its own
+  // family stays its own task.)
   const groupMap = new Map();
   for (const cluster of clusters) {
-    const hyp = componentOf.get(cluster.id) || null;
     const family = remediationFamily(cluster.ruleId);
-    const scope = hyp ? hyp.id : `cluster:${cluster.id}`;
-    const key = `${scope}::${family}`;
-    if (!groupMap.has(key)) groupMap.set(key, { key, family, clusters: [], hypothesis: hyp });
+    const key = `${cluster.ruleId}::${family}`;
+    if (!groupMap.has(key)) groupMap.set(key, { key, family, clusters: [], hypothesis: null });
     groupMap.get(key).clusters.push(cluster);
+  }
+
+  // Attach the component hypotheses each group's clusters belong to, as evidence.
+  // The primary (most-recurring) hypothesis drives the blueprint/title for
+  // back-compat; the full set is exposed on the task for the UI to show context.
+  for (const g of groupMap.values()) {
+    const hyps = [];
+    const seen = new Set();
+    for (const c of g.clusters) {
+      const h = componentOf.get(c.id);
+      if (h && !seen.has(h.id)) { seen.add(h.id); hyps.push(h); }
+    }
+    hyps.sort((a, b) => (b.occurrencesCount || 0) - (a.occurrencesCount || 0) || (b.pagesCount || 0) - (a.pagesCount || 0));
+    g.componentHypotheses = hyps;
+    g.hypothesis = hyps[0] || null;
   }
 
   // Deterministic ordering: sort clusters within each group, and sort the groups
@@ -106,7 +125,7 @@ function clusterSortKey(a, b) {
  * and rule set across members so nothing is lost.
  */
 function buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, workspaceId, rejectedTech = []) {
-  const { clusters, hypothesis, family } = group;
+  const { clusters, hypothesis, family, componentHypotheses = [] } = group;
   const primary = clusters[0]; // stable: clusters were sorted by identity
 
   // Aggregate across member clusters.
@@ -153,12 +172,17 @@ function buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, 
   const title = getTaskTitle(primary, hypothesis);
 
   // Merge each member's grouping rationale, and add a consolidation line so the
-  // task explains why several patterns became one unit of work.
+  // task explains why several patterns became one unit of work. Tasks now
+  // consolidate every occurrence of a rule; when those occurrences span several
+  // structural components, name them so the reader sees the spread as evidence.
   const groupingRationale = [...new Set(clusters.flatMap(c => c.groupingRationale || []))];
   if (isConsolidated) {
+    const componentNote = componentHypotheses.length > 1
+      ? ` across ${componentHypotheses.length} structural components`
+      : (hypothesis?.name ? ` (${hypothesis.name})` : '');
     groupingRationale.unshift(
-      `Consolidated ${clusters.length} pattern variants into one component-level task` +
-      (hypothesis?.name ? ` (${hypothesis.name})` : '') + '.'
+      `Consolidated ${clusters.length} pattern variants for rule '${primary.ruleId}' into one task` +
+      componentNote + '.'
     );
   }
 
@@ -211,6 +235,7 @@ function buildTaskFromGroup(group, totalPages, userConfirmedTech, scanMetadata, 
       pagesPercentage
     },
     componentHypothesis: hypothesis,
+    componentHypotheses,
     roles,
     technologyContext,
     blueprint,
