@@ -180,4 +180,31 @@ describe('Phase 6 blockers: stable identity & order-independent consolidation', 
     assert.equal(tasks[0].remediationFamily, 'accessible-name');
     assert.equal(tasks[0].observations.length, 2);
   });
+
+  test('one rule spanning many components is ONE task, not one per component', () => {
+    // Reproduces the QualWeb fan-out: several findings of the SAME rule with no
+    // shared locator, which the component engine assigns to DIFFERENT structural
+    // components. These must not fragment into one task per component.
+    const a = cluster('c1', 'style_focus_visible', '', 'PAT-A');
+    const b = cluster('c2', 'style_focus_visible', '', 'PAT-B');
+    const c = cluster('c3', 'style_focus_visible', '', 'PAT-C');
+    // Each cluster is its own single-member "component" (as happens with no
+    // shared structure). Single-member hypotheses are not even applied by the
+    // task builder, but pass them to prove multi-component spread rolls up.
+    const comps = [
+      { id: 'COMP-1', clusterIds: ['c1', 'c2'], name: 'Component One', confidence: 'high', occurrencesCount: 2, pagesCount: 1 },
+      { id: 'COMP-2', clusterIds: ['c3'], name: 'Component Two', confidence: 'medium', occurrencesCount: 1, pagesCount: 1 }
+    ];
+    const tasks = buildRemediationTasks([a, b, c], comps, 1, null, null, 'REPORT-A');
+
+    assert.equal(tasks.length, 1, 'one rule -> one task regardless of component spread');
+    const t = tasks[0];
+    assert.equal(t.ruleId, 'style_focus_visible');
+    assert.equal(t.observations.length, 3, 'every occurrence retained as evidence');
+    assert.equal(t.metrics.patternVariantCount, 3);
+    // The spanned components are surfaced as evidence on the task.
+    assert.ok(Array.isArray(t.componentHypotheses));
+    assert.equal(t.componentHypotheses.length, 1, 'only the multi-cluster component is attributed');
+    assert.ok(t.groupingRationale.some(r => /Consolidated 3 pattern variants for rule/i.test(r)));
+  });
 });
