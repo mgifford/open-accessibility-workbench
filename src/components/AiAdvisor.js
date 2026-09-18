@@ -44,6 +44,20 @@ export class AiAdvisor extends HTMLElement {
       const { decision } = await probeAndDecide(globalThis, { transformersBuilt: FEATURES.aiModelRuntime });
       this._route = decision.route;
       this._routeReason = decision.reason;
+
+      // A browser that reports a READY built-in AI is cheap to verify without any
+      // download, so confirm it actually generates (not a stub that echoes the
+      // prompt) before offering it. A model that is merely DOWNLOADABLE is not
+      // self-tested here — that would trigger a download; it is verified at
+      // prepare() time instead. Either way a stub never reaches "Generate".
+      if (this._route === 'browser-prompt') {
+        const test = await this.provider().selfTest?.();
+        if (test && !test.usable) {
+          this._route = 'deterministic';
+          this._routeReason = test.reason;
+          this._provider = null; // drop the unusable browser provider
+        }
+      }
     } catch {
       this._route = 'deterministic';
       this._routeReason = 'Capability probe failed; using deterministic guidance.';
@@ -87,11 +101,18 @@ export class AiAdvisor extends HTMLElement {
    * an "Enable" that only flips to an inert "Enabled" state.
    */
   renderUnavailableGate() {
+    // If we reached the deterministic floor because a browser Prompt API was
+    // exposed but failed its self-test (a stub/echo model), say so specifically
+    // rather than implying the build ships no model.
+    const stubDetected = /echo|not actually available|did not produce|self-test|no output/i.test(this._routeReason || '');
+    const lead = stubDetected
+      ? `<strong>This browser’s built-in AI isn’t usable here.</strong> ${escapeHtml(this._routeReason)} There is nothing to enable — the deterministic guidance below works without it.`
+      : `<strong>AI drafting is not available in this build.</strong> This deployment ships no on-device model, so there is nothing to enable or download here.`;
     this.innerHTML = `
       <div class="card">
         <h3 style="font-weight: 700; font-size: var(--font-size-base);">Local AI advisor</h3>
         <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: var(--space-2) 0;">
-          <strong>AI drafting is not available in this build.</strong> This deployment ships no on-device model, so there is nothing to enable or download here.
+          ${lead}
         </p>
         <p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin: var(--space-2) 0;">
           On-device drafting is planned for a later release (it would run entirely in your browser — your report would never be uploaded). The deterministic guidance on this task works fully without it.
@@ -307,6 +328,17 @@ export class AiAdvisor extends HTMLElement {
         });
         aiConsentStore.markReady('browser');
       } catch (err) {
+        // A stub/echo Prompt API surfaces here: don't offer a broken Generate —
+        // switch to the honest "AI drafting is not available" gate so the user
+        // isn't led into a generate that can only fail.
+        if (err && err.name === 'BrowserAiUnusableError') {
+          this._route = 'deterministic';
+          this._routeReason = err.message;
+          this._provider = null;
+          aiConsentStore.disable();
+          aiConsentStore.setRoute('deterministic');
+          return;
+        }
         aiConsentStore.markError(err.message || 'The browser could not prepare its AI');
       }
     });

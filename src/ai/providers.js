@@ -20,7 +20,7 @@
  * deterministic validators; `finalCandidate` is null unless a candidate passed.
  */
 
-import { resolvePath, normalizeAvailability } from './browser-capabilities.js';
+import { resolvePath, normalizeAvailability, verifyPromptApiUsable } from './browser-capabilities.js';
 import { buildRemediationPrompt } from './prompt.js';
 import { runValidationLoop, buildValidationExport } from './validation-loop.js';
 import {
@@ -164,6 +164,7 @@ export const deterministicProvider = {
 export function createBrowserPromptProvider(root = globalThis, options = {}) {
   const languageModel = resolvePath(root, 'LanguageModel') || resolvePath(root, 'ai.languageModel');
   let session = null;
+  let selfTestResult = null; // cached { usable, reason } — the probe runs at most once
 
   async function ensureSession() {
     if (session) return session;
@@ -217,24 +218,53 @@ export function createBrowserPromptProvider(root = globalThis, options = {}) {
       }
       return normalizeAvailability(await languageModel.availability());
     },
+    /**
+     * Confirms the Prompt API actually produces model output rather than echoing
+     * the prompt or returning a "not available" stub (some Chromium builds expose
+     * such a stub while `availability()` still reports "available"). Cached so the
+     * one-time cost is paid once. Callers should run this only when the model is
+     * ready/prepared, since it performs a real (tiny) generation.
+     */
+    async selfTest() {
+      if (selfTestResult) return selfTestResult;
+      selfTestResult = await verifyPromptApiUsable(languageModel);
+      return selfTestResult;
+    },
     /** Disclosed, user-initiated download of the browser-managed model. */
     async prepare(onProgress) {
       if (!languageModel || typeof languageModel.create !== 'function') throw new Error('Browser-provided AI is not available.');
       const availability = await this.availability();
-      if (availability.ready) return availability;
-      if (availability.status !== 'downloadable' && availability.status !== 'downloading') {
-        throw new Error('Browser-provided AI cannot be downloaded in this browser.');
+      if (!availability.ready) {
+        if (availability.status !== 'downloadable' && availability.status !== 'downloading') {
+          throw new Error('Browser-provided AI cannot be downloaded in this browser.');
+        }
+        session = await languageModel.create({
+          signal: options.signal,
+          monitor: (monitor) => monitor?.addEventListener?.('downloadprogress', (event) =>
+            onProgress?.({ phase: 'download', progress: Math.round((event.loaded ?? event.progress ?? 0) * 100) }))
+        });
       }
-      session = await languageModel.create({
-        signal: options.signal,
-        monitor: (monitor) => monitor?.addEventListener?.('downloadprogress', (event) =>
-          onProgress?.({ phase: 'download', progress: Math.round((event.loaded ?? event.progress ?? 0) * 100) }))
-      });
+      // The model is present; confirm it actually works before reporting ready,
+      // so a stub/echo API surfaces here (honest) rather than at generate time.
+      const test = await this.selfTest();
+      if (!test.usable) {
+        const err = new Error(test.reason);
+        err.name = 'BrowserAiUnusableError';
+        throw err;
+      }
       return { status: 'available', ready: true, downloadable: false };
     },
     async generate({ task, sourceContext = null, validationContext = null, isCancelled, onProgress } = {}) {
       const availability = await this.availability();
       if (!availability.ready) throw new Error('Browser-provided AI is not ready. Approve its browser-managed download first.');
+      // Guard against a stub/echo Prompt API that reports ready but does not
+      // generate — fail clearly instead of feeding an echo through validation.
+      const test = await this.selfTest();
+      if (!test.usable) {
+        const err = new Error(test.reason);
+        err.name = 'BrowserAiUnusableError';
+        throw err;
+      }
       return runLoopWith({
         task, sourceContext, validationContext, generateText, isCancelled, onProgress,
         provenanceBase: { model: 'browser-managed', modelRevision: 'browser', runtime: 'browser-prompt-api', device: 'browser' }

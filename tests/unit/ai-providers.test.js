@@ -35,11 +35,17 @@ const validCandidate = {
 };
 
 // A fake browser Prompt API returning a scripted response string.
-function fakeLanguageModel(responseText, { supportsConstraint = true } = {}) {
+function fakeLanguageModel(responseText, { supportsConstraint = true, selfTestUsable = true } = {}) {
   const calls = { create: 0, prompts: [] };
   const session = {
     async prompt(text, opts) {
       calls.prompts.push({ text, opts });
+      // The provider self-tests the model with a tiny "reply READY" probe before
+      // generating; a working fake answers it so generation proceeds. Set
+      // selfTestUsable:false to simulate a stub/echo model.
+      if (/READY/.test(text) && text.length < 80) {
+        return selfTestUsable ? 'READY' : `echo: ${text}`;
+      }
       if (opts?.responseConstraint && !supportsConstraint) {
         throw new Error('unsupported option: responseConstraint');
       }
@@ -100,6 +106,16 @@ describe('browser prompt provider: validation passthrough', () => {
     const provider = createBrowserPromptProvider(root);
     const r = await provider.generate({ task });
     assert.equal(r.finalCandidate, null);
+  });
+
+  test('a stub/echo model fails the self-test and generate throws BrowserAiUnusableError', async () => {
+    // Model echoes the probe instead of answering — the provider must refuse to
+    // generate rather than feed the echo through validation.
+    const { root } = fakeLanguageModel(JSON.stringify(validCandidate), { selfTestUsable: false });
+    const provider = createBrowserPromptProvider(root);
+    const test = await provider.selfTest();
+    assert.equal(test.usable, false);
+    await assert.rejects(() => provider.generate({ task }), (err) => err.name === 'BrowserAiUnusableError');
   });
 
   test('falls back to an unconstrained prompt when responseConstraint is unsupported', async () => {
