@@ -16,6 +16,7 @@ let loadedModelId = null;
 let loadedDevice = null;
 let loadAbort = null;
 let cancelGeneration = false;
+let textStreamer = null; // TextStreamer class from the loaded transformers module
 
 function post(msg) { self.postMessage(msg); }
 
@@ -41,6 +42,7 @@ self.onmessage = async (e) => {
       pipeline = res.pipeline;
       loadedModelId = modelId;
       loadedDevice = res.device;
+      textStreamer = res.TextStreamer || null;
       post({ id, type: 'LOADED', device: res.device });
     } catch (err) {
       pipeline = null; loadedModelId = null; loadedDevice = null;
@@ -79,9 +81,17 @@ self.onmessage = async (e) => {
         validationContext: validationContext || { originalSnippet: task.representativeHtml },
         isCancelled: () => cancelGeneration,
         generate: async (feedback, attempt) => {
-          post({ id, progress: { phase: 'inference', status: `Generating (attempt ${attempt})…` } });
+          post({ id, progress: { phase: 'inference', status: `Generating (attempt ${attempt})…`, attempt } });
           const prompt = buildRemediationPrompt(task, sourceContext, feedback);
-          return runGenerate(pipeline, prompt, { maxNewTokens: 256, temperature: 0.2 });
+          // Stream partial tokens back for a live preview. The partial text is
+          // raw and unverified — it is shown only to make the wait feel alive;
+          // the full returned text still goes through the validation gate.
+          return runGenerate(pipeline, prompt, {
+            maxNewTokens: 256,
+            temperature: 0.2,
+            TextStreamer: textStreamer,
+            onToken: (partial) => post({ id, progress: { phase: 'inference', status: `Generating (attempt ${attempt})…`, attempt, partial } })
+          });
         }
       });
       post({

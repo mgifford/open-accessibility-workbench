@@ -105,26 +105,54 @@ export async function loadModel(opts) {
   });
 
   if (signal?.aborted) { try { await pipeline.dispose?.(); } catch { /* ignore */ } throw new DOMException('Load cancelled.', 'AbortError'); }
-  return { pipeline, device: chosenDevice };
+  // Expose the streamer class from the loaded module so callers can stream
+  // tokens without importing transformers.js themselves.
+  return { pipeline, device: chosenDevice, TextStreamer: tf.TextStreamer || null };
 }
 
 /**
  * Runs generation and returns the raw generated text (the caller parses/validates
  * it — this module never trusts or shapes the output).
+ *
+ * When `onToken` is supplied, generated tokens are streamed to it as they are
+ * produced, so a caller (the worker) can relay a live preview to the UI. The
+ * callback receives the CUMULATIVE text so far, matching the browser Prompt API
+ * route; the full text is still returned and is what the validation loop uses.
+ * Streaming changes only how the wait is shown, never what is validated.
+ *
  * @param {any} pipeline
  * @param {string} prompt
  * @param {object} [opts]
+ * @param {(cumulativeText: string) => void} [opts.onToken]
+ * @param {any} [opts.TextStreamer] - transformers.js TextStreamer (injectable for tests)
  * @returns {Promise<string>}
  */
 export async function generate(pipeline, prompt, opts = {}) {
-  const { maxNewTokens = 256, temperature = 0.2, signal } = opts;
+  const { maxNewTokens = 256, temperature = 0.2, signal, onToken = null, TextStreamer = null } = opts;
   if (signal?.aborted) throw new DOMException('Generation cancelled.', 'AbortError');
-  const out = await pipeline(prompt, {
+
+  const genOpts = {
     max_new_tokens: maxNewTokens,
     temperature,
     do_sample: temperature > 0,
     return_full_text: false
-  });
+  };
+
+  // Stream tokens to the caller when possible. TextStreamer's callback receives
+  // each new chunk of decoded text; we accumulate and report the running total.
+  if (typeof onToken === 'function' && TextStreamer && pipeline?.tokenizer) {
+    let cumulative = '';
+    genOpts.streamer = new TextStreamer(pipeline.tokenizer, {
+      skip_prompt: true,
+      skip_special_tokens: true,
+      callback_function: (chunk) => {
+        cumulative += typeof chunk === 'string' ? chunk : '';
+        try { onToken(cumulative); } catch { /* a preview failure must never break generation */ }
+      }
+    });
+  }
+
+  const out = await pipeline(prompt, genOpts);
   // transformers.js returns [{ generated_text }] (string) for text-generation.
   const text = Array.isArray(out) ? (out[0]?.generated_text ?? '') : (out?.generated_text ?? '');
   return typeof text === 'string' ? text : '';
