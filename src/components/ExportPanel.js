@@ -9,13 +9,13 @@ import { escapeHtml } from '../utils/escape-html.js';
  * preview shows the COMPLETE document (scrollable), and Download / Copy act on
  * the same full text — nothing is truncated.
  *
- * Note on the JSON label: the task-level JSON is honest about NOT yet embedding
- * observation-level record pointers (see src/export/json.js), so it is not
- * described as "full provenance".
+ * The JSON export embeds each task's constituent observations with their record
+ * pointers back into the scan report (see src/export/json.js), so it carries
+ * finding-level provenance.
  */
 const FORMATS = [
   { key: 'md', title: 'Markdown Document', filename: 'remediation-plan.md', mime: 'text/markdown', build: (d) => exportTasksToMarkdown(d) },
-  { key: 'json', title: 'JSON (task-level)', filename: 'remediation-plan.json', mime: 'application/json', build: (d) => exportTasksToJson(d) },
+  { key: 'json', title: 'JSON (with finding provenance)', filename: 'remediation-plan.json', mime: 'application/json', build: (d) => exportTasksToJson(d) },
   { key: 'jsonld', title: 'JSON-LD (W3C linked data)', filename: 'remediation-plan.jsonld', mime: 'application/ld+json', build: (d) => exportTasksToJsonLd(d) }
 ];
 

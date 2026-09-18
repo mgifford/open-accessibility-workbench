@@ -1,11 +1,32 @@
 /**
  * Exports remediation tasks in standard JSON format.
  *
- * NOTE: this is a task-level export. It does not yet embed each task's
- * constituent observations or their record pointers; full observation-level
- * provenance in exports is a later-phase deliverable. Do not describe this
- * output as carrying full provenance.
+ * Each task embeds a compact record of its constituent observations — the exact
+ * source findings it consolidates — so the export carries finding-level
+ * provenance: for every observation, its record pointer back into the original
+ * scan report, the scanner that reported it, the page, and the element locator.
+ * Nothing is invented; every field is copied from the imported observation.
  */
+
+/**
+ * Compact, traceable provenance for one observation. Copied verbatim from the
+ * imported finding so a reader can follow it back to the exact source record.
+ */
+function observationProvenance(o = {}) {
+  const src = o.source || {};
+  return {
+    id: o.id || null,
+    scanner: o.provenance?.scanner || null,
+    // Where this finding lives in the original scan report (e.g.
+    // "/results/0/axe/failures/1"), plus the report it came from.
+    recordPointer: src.recordPointer || null,
+    sourceReport: src.originalRef || null,
+    scanId: src.scanId || null,
+    page: o.page?.submittedUrl || null,
+    locator: o.evidence?.locator || null,
+    isDuplicate: Boolean(o.duplicate?.isDuplicate)
+  };
+}
 
 export function exportTasksToJson(workspaceData, options = {}) {
   const {
@@ -53,7 +74,10 @@ export function exportTasksToJson(workspaceData, options = {}) {
       // whether the user confirmed it.
       technologyContext: t.technologyContext,
       blueprint: t.blueprint,
-      affectedPages: t.affectedPages
+      affectedPages: t.affectedPages,
+      // Finding-level provenance: the exact source observations this task
+      // consolidates, each traceable back to its record in the scan report.
+      observations: (t.observations || []).map(observationProvenance)
     }))
   };
 
