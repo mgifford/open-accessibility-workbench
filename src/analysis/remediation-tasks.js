@@ -3,6 +3,7 @@ import { getRolesForWcag } from '../roles/arrm.js';
 import { getTechnologyContext } from '../technology/context.js';
 import { generateRemediationBlueprint } from '../guidance/remediation.js';
 import { contentHash as shortHash } from './source-registry.js';
+import { describeRule } from '../rules/rule-descriptions.js';
 
 /**
  * Builds actionable RemediationTask objects from PatternClusters and ComponentHypotheses.
@@ -262,5 +263,10 @@ function getTaskTitle(cluster, hypothesis) {
   if (cluster.ruleId === 'region') {
     return `Wrap page structure in semantic landmark elements`;
   }
-  return `Remediate ${cluster.ruleId} accessibility issues across ${cluster.pagesCount} pages`;
+  // Prefer a verified friendly rule name over an opaque id/URL in the fallback
+  // title, so a rule like `https://alfa.siteimprove.com/rules/sia-r111` reads as
+  // "Target size (enhanced)".
+  const friendly = describeRule(cluster.sourceRuleId) || describeRule(cluster.ruleId);
+  const label = friendly?.title || cluster.ruleId;
+  return `Remediate ${label} accessibility issues across ${cluster.pagesCount} pages`;
 }

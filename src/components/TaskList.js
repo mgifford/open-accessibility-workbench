@@ -6,6 +6,7 @@ import { taskStatusStore, TASK_STATUSES, TASK_STATUS_LABELS } from '../state/tas
 import { renderRoleGuidance } from '../roles/render-role-guidance.js';
 import { buildScanScope } from '../analysis/scan-scope.js';
 import { renderScanHeader } from './scan-header.js';
+import { resolveRuleDisplay } from '../rules/rule-descriptions.js';
 
 /** How many affected-page URLs to list per task before "+N more". */
 const MAX_URLS_SHOWN = 3;
@@ -220,9 +221,7 @@ export class TaskList extends HTMLElement {
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2);">
           <div>
             <a href="#/task/${escapeAttr(t.id)}" style="font-size: var(--font-size-lg); font-weight: 700; color: var(--color-brand-primary); text-decoration: none;">${escapeHtml(t.title)}</a>
-            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
-              Rule: <code>${escapeHtml(t.ruleId)}</code> (WCAG ${escapeHtml(t.wcag.join(', ')) || 'N/A'})
-            </div>
+            ${renderRuleLine(t)}
           </div>
           <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
             ${t.consolidated ? `<span class="badge badge-medium">Consolidated: ${t.metrics.patternVariantCount} patterns</span>` : ''}
@@ -376,6 +375,27 @@ export class TaskList extends HTMLElement {
  * Renders the capability-routing verdict for a task. Relevance is communicated
  * with a text label and a reason — not colour alone (spec §7.4).
  */
+/**
+ * Renders the rule line for a task: a friendly title where one is verified, the
+ * rule id (linked to its source when known), the WCAG SC(s), and the scanner's
+ * own plain-English description. Falls back honestly to the raw id when a rule is
+ * not in the verified map.
+ */
+function renderRuleLine(t) {
+  const d = resolveRuleDisplay(t);
+  const wcagText = d.wcag.length ? `WCAG ${escapeHtml(d.wcag.join(', '))}` : 'WCAG not specified';
+  const idText = escapeHtml(d.ruleId);
+  const ruleId = d.sourceUrl
+    ? `<a href="${escapeAttr(safeUrl(d.sourceUrl))}" target="_blank" rel="noopener noreferrer"><code>${idText}</code></a>`
+    : `<code>${idText}</code>`;
+  const titlePart = d.title ? `${escapeHtml(d.title)} — ` : '';
+  return `
+    <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
+      ${titlePart}Rule: ${ruleId} (${wcagText})
+    </div>
+    ${d.description ? `<div style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--space-1);">${escapeHtml(d.description)}</div>` : ''}`;
+}
+
 function renderRelevance(route) {
   if (!route || route.relevance === 'unfiltered') return '';
   const labels = {

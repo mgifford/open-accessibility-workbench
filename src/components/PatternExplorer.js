@@ -4,6 +4,7 @@ import { buildScanScope, rankPatternsByStrength, patternStrength } from '../anal
 import { renderScanHeader } from './scan-header.js';
 import { patternFingerprintOf } from '../analysis/fingerprints.js';
 import { renderFingerprint, renderFingerprintNote } from './fingerprint.js';
+import { resolveRuleDisplay } from '../rules/rule-descriptions.js';
 
 const STRENGTH_BADGE = {
   strong: { label: 'Strong pattern', cls: 'badge-high' },
@@ -64,7 +65,20 @@ export class PatternExplorer extends HTMLElement {
               <article class="card" style="border-left: 4px solid var(--color-brand-primary);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2);">
                   <div>
-                    <h3 style="font-size: var(--font-size-lg); font-weight: 700;">Pattern: ${escapeHtml(c.ruleId)}</h3>
+                    ${(() => {
+                      const d = resolveRuleDisplay(c);
+                      const idText = escapeHtml(d.ruleId);
+                      const ruleLink = d.sourceUrl
+                        ? `<a href="${escapeAttr(safeUrl(d.sourceUrl))}" target="_blank" rel="noopener noreferrer"><code>${idText}</code></a>`
+                        : `<code>${idText}</code>`;
+                      const wcagText = d.wcag.length ? ` · WCAG ${escapeHtml(d.wcag.join(', '))}` : '';
+                      return `
+                        <h3 style="font-size: var(--font-size-lg); font-weight: 700;">Pattern: ${d.title ? escapeHtml(d.title) : idText}</h3>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: var(--space-1);">
+                          Rule: ${ruleLink}${wcagText}
+                        </div>
+                        ${d.description ? `<div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-1);">${escapeHtml(d.description)}</div>` : ''}`;
+                    })()}
                     <div style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: var(--space-1);">
                       ${c.upstreamPatternId ? `Authoritative Upstream ID: <code>${escapeHtml(c.upstreamPatternId)}</code>` : 'Synthesized DOM cluster'}
                     </div>
