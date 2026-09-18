@@ -199,3 +199,49 @@ describe('Phase 8 gate: framework guidance EXTENDS, never replaces generic', () 
     assert.deepEqual(exported.patternClusterIds, ['c1']);
   });
 });
+
+import { normalizeDetectorTechnologies } from '../../src/technology/imported-detectors.js';
+
+describe('Phase 8: imported Wappalyzer detector shapes are accepted', () => {
+  test('normalizes the wappalyzer-python3 object shape (versions + categories)', () => {
+    const recs = normalizeDetectorTechnologies({
+      Drupal: { versions: ['10'], categories: ['CMS'] },
+      jQuery: { versions: [], categories: ['JavaScript libraries'] }
+    });
+    assert.equal(recs.length, 2);
+    assert.equal(recs[0].name, 'Drupal');
+    assert.deepEqual(recs[0].versions, ['10']);
+    assert.equal(recs[0].category, 'CMS');
+  });
+
+  test('normalizes the PyPI wappalyzer analyze() object shape (version + confidence)', () => {
+    const recs = normalizeDetectorTechnologies({
+      Drupal: { version: '10', confidence: 100, categories: ['CMS'], groups: ['CMS'] }
+    });
+    assert.equal(recs[0].name, 'Drupal');
+    assert.deepEqual(recs[0].versions, ['10']);
+    assert.equal(recs[0].confidence, 100); // passed through for downstream normalization
+  });
+
+  test('still accepts the workbench array shape', () => {
+    const recs = normalizeDetectorTechnologies([{ name: 'WordPress', confidence: 'high' }]);
+    assert.equal(recs[0].name, 'WordPress');
+  });
+
+  test('a Wappalyzer object in scanMetadata.technologies is detected with its version', () => {
+    const t = detectTechnologyFromObservations([], null, {
+      technologies: { Drupal: { versions: ['10'], categories: ['CMS'] } }
+    });
+    assert.equal(t.name, 'Drupal');
+    assert.equal(t.source, 'metadata');
+    assert.deepEqual(t.versions, ['10']);
+    // No confidence reported by this shape -> present-but-unqualified, never high.
+    assert.equal(t.confidence, 'medium');
+  });
+
+  test('a reported confidence of 100 maps to high; rejection still falls through', () => {
+    const meta = { detectorResults: { Drupal: { confidence: 100, categories: ['CMS'] }, jQuery: { confidence: 100 } } };
+    assert.equal(detectTechnologyFromObservations([], null, meta).confidence, 'high');
+    assert.equal(detectTechnologyFromObservations([], null, meta, ['drupal']).name, 'jQuery');
+  });
+});

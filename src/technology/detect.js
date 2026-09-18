@@ -12,6 +12,8 @@
  * classification, and a weak clue never raises confidence above "low".
  */
 
+import { normalizeDetectorTechnologies } from './imported-detectors.js';
+
 /**
  * @typedef {object} TechnologyContext
  * @property {string} name         - technology name, or "Unknown"
@@ -101,7 +103,7 @@ export function normalizeConfidence(value) {
 
 /** Maps a raw imported record to a context, preserving raw fields. */
 function toContext(rec, source) {
-  return {
+  const ctx = {
     name: rec.name,
     category: rec.category || getCategoryForTech(rec.name),
     confidence: normalizeConfidence(rec.confidence),
@@ -109,28 +111,35 @@ function toContext(rec, source) {
     evidence: Array.isArray(rec.evidence) ? rec.evidence
       : [source === 'metadata' ? 'Technology reported in scan metadata.' : 'Imported technology detector output.'],
     confirmed: false,
-    raw: rec // preserve unrecognized upstream fields
+    // Preserve the ORIGINAL upstream object (the normalizer keeps it on `raw`),
+    // so unrecognized fields stay at ctx.raw rather than nested a level deeper.
+    raw: rec.raw || rec
   };
-}
-
-function pickMetadataTechnology(scanMetadata, rejectedSet) {
-  const list = scanMetadata?.technologies;
-  if (!Array.isArray(list) || list.length === 0) return null;
-  const usable = list.filter(t => t && t.name && !rejectedSet.has(String(t.name).toLowerCase()));
-  if (usable.length === 0) return null;
-  const ctx = toContext(usable[0], 'metadata');
-  // Preserve EVERY imported record separately from the selected context (#5).
-  ctx.allTechnologies = usable.map(t => toContext(t, 'metadata'));
+  if (Array.isArray(rec.versions) && rec.versions.length) ctx.versions = rec.versions;
   return ctx;
 }
 
+function pickMetadataTechnology(scanMetadata, rejectedSet) {
+  return pickDetectorList(scanMetadata?.technologies, 'metadata', rejectedSet);
+}
+
 function pickImportedDetector(scanMetadata, rejectedSet) {
-  const list = scanMetadata?.detectorResults;
-  if (!Array.isArray(list) || list.length === 0) return null;
-  const usable = list.filter(t => t && t.name && !rejectedSet.has(String(t.name).toLowerCase()));
+  return pickDetectorList(scanMetadata?.detectorResults, 'detector', rejectedSet);
+}
+
+/**
+ * Shared: normalizes an imported detector list (array OR a Wappalyzer object
+ * keyed by technology name) to records, drops rejected ones, and returns the
+ * first as the selected context while preserving every record on `allTechnologies`.
+ */
+function pickDetectorList(raw, source, rejectedSet) {
+  if (!raw) return null;
+  const records = normalizeDetectorTechnologies(raw);
+  const usable = records.filter(t => t && t.name && !rejectedSet.has(String(t.name).toLowerCase()));
   if (usable.length === 0) return null;
-  const ctx = toContext(usable[0], 'detector');
-  ctx.allTechnologies = usable.map(t => toContext(t, 'detector'));
+  const ctx = toContext(usable[0], source);
+  // Preserve EVERY imported record separately from the selected context (#5).
+  ctx.allTechnologies = usable.map(t => toContext(t, source));
   return ctx;
 }
 
