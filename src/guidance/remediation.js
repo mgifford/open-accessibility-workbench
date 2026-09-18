@@ -5,6 +5,25 @@
 import { getTechnologyGuidance } from './technology-guidance.js';
 import { getExactRuleGuidance } from './exact-rule.js';
 import { retrieveGuidance } from './retrieve.js';
+import { describeRule } from '../rules/rule-descriptions.js';
+
+/**
+ * A readable problem statement for a rule the blueprint has no bespoke text for.
+ * Prefers the scanner's own plain-English description of the finding, then a
+ * verified friendly rule title, and only falls back to naming the rule id when
+ * neither is available. Nothing is invented — the description comes from the
+ * scanner and the title from a verified rule page.
+ */
+function genericProblemStatement(ruleId, cluster) {
+  const obs = Array.isArray(cluster?.observations) ? cluster.observations : [];
+  const scannerDescription = obs.map(o => (o?.evidence?.description || '').trim()).find(Boolean);
+  if (scannerDescription) return scannerDescription;
+
+  const friendly = describeRule(cluster?.sourceRuleId) || describeRule(ruleId);
+  if (friendly?.title) return `${friendly.title}: this element does not satisfy the rule.`;
+
+  return `Accessibility failure for rule '${ruleId}'.`;
+}
 
 /** Decision concern -> the role that typically makes it (guidance, not ownership). */
 const DECISION_ROLE = {
@@ -30,7 +49,7 @@ export function generateRemediationBlueprint(taskMeta) {
   const occurrencesCount = cluster.occurrencesCount || 1;
   const isMultiPage = pagesCount > 1;
 
-  let problem = `Accessibility failure for rule '${ruleId}'.`;
+  let problem = genericProblemStatement(ruleId, cluster);
   let whySystemic = isMultiPage
     ? `This pattern recurs across ${pagesCount} pages (${occurrencesCount} total occurrences), indicating a shared component, template, or global token.`
     : `This failure was observed on a single page, but may affect other instances of this component.`;

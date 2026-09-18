@@ -162,6 +162,30 @@ describe('Phase 9 hardening: no invented content; honest validation & handoff', 
     }
   });
 
+  test('an unmapped rule uses the scanner description as its problem statement', () => {
+    // A rule with no bespoke blueprint branch and a scanner-provided description
+    // reads that description, not the opaque "Accessibility failure for rule".
+    const bp = generateRemediationBlueprint({
+      ruleId: 'element_attribute_deprecated',
+      cluster: {
+        pagesCount: 1, occurrencesCount: 1,
+        observations: [{ evidence: { description: 'The HTML attribute(s) "color" is deprecated in HTML 5' } }]
+      },
+      technologyContext: null
+    });
+    assert.match(bp.problem, /deprecated in HTML 5/);
+    assert.doesNotMatch(bp.problem, /Accessibility failure for rule/);
+  });
+
+  test('with no description or friendly title, the problem names the rule honestly', () => {
+    const bp = generateRemediationBlueprint({
+      ruleId: 'some_unknown_rule',
+      cluster: { pagesCount: 1, occurrencesCount: 1, observations: [] },
+      technologyContext: null
+    });
+    assert.match(bp.problem, /some_unknown_rule/);
+  });
+
   test('handoff routing agrees with the Phase 7 capability router', () => {
     const bp = generateRemediationBlueprint({ ruleId: 'link-name', cluster: {}, remediationFamily: 'accessible-name', technologyContext: null });
     const task = { id: 'T', title: 'x', ruleId: 'link-name', remediationFamily: 'accessible-name',
