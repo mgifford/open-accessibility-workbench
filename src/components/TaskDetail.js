@@ -9,6 +9,7 @@ import { FEATURES } from '../state/features.js';
 import '../components/HandoffBuilder.js';
 import { patternFingerprintOf, occurrenceFingerprintOf } from '../analysis/fingerprints.js';
 import { renderFingerprint, renderFingerprintNote } from './fingerprint.js';
+import { resolveRuleDisplay } from '../rules/rule-descriptions.js';
 
 export class TaskDetail extends HTMLElement {
   constructor() {
@@ -74,9 +75,7 @@ export class TaskDetail extends HTMLElement {
             <div>
               <span style="font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-muted);">TASK ID: ${escapeHtml(task.id)}</span>
               <h2 style="font-size: var(--font-size-2xl); font-weight: 800; margin-top: var(--space-1);">${escapeHtml(task.title)}</h2>
-              <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-1);">
-                Rule: <code>${escapeHtml(task.ruleId)}</code> (WCAG: ${escapeHtml(task.wcag.join(', ')) || 'N/A'})
-              </div>
+              ${renderRuleInfo(task)}
               ${renderFingerprint(patternFingerprintOf(task), { label: 'Pattern fingerprint' })}
             </div>
             <div style="display: flex; gap: var(--space-2);">
@@ -345,6 +344,25 @@ function renderTaskTechnology(task) {
       </div>` : ''}
     </div>
   `;
+}
+
+/**
+ * Rule heading for the task detail: a verified friendly title where available,
+ * the rule id linked to its source, the WCAG SC(s), and the scanner's own
+ * plain-English description. Falls back honestly to the raw id.
+ */
+function renderRuleInfo(task) {
+  const d = resolveRuleDisplay(task);
+  const wcagText = d.wcag.length ? `WCAG ${escapeHtml(d.wcag.join(', '))}` : 'WCAG not specified';
+  const idText = escapeHtml(d.ruleId);
+  const ruleId = d.sourceUrl
+    ? `<a href="${escapeAttr(safeUrl(d.sourceUrl))}" target="_blank" rel="noopener noreferrer"><code>${idText}</code></a>`
+    : `<code>${idText}</code>`;
+  return `
+    <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-1);">
+      ${d.title ? `<strong>${escapeHtml(d.title)}</strong> — ` : ''}Rule: ${ruleId} (${wcagText})
+    </div>
+    ${d.description ? `<div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-1);">${escapeHtml(d.description)}</div>` : ''}`;
 }
 
 customElements.define('task-detail', TaskDetail);
