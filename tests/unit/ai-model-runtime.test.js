@@ -73,6 +73,43 @@ describe('Phase 15: model runtime load/generate/dispose (mocked)', () => {
     assert.equal(text, '{"summary":"ok"}');
   });
 
+  test('generate streams cumulative partial text via onToken when a TextStreamer is given', async () => {
+    // A streaming pipeline: it drives the streamer's callback with token chunks,
+    // then returns the full text. A fake TextStreamer captures the callback.
+    const chunks = ['{"sum', 'mary":', '"ok"}'];
+    let captured = null;
+    class FakeTextStreamer {
+      constructor(tokenizer, opts) { captured = opts; this.tokenizer = tokenizer; }
+    }
+    const streamingPipeline = Object.assign(
+      async (prompt, opts) => {
+        // The runtime passes our streamer through as opts.streamer.
+        assert.ok(opts.streamer instanceof FakeTextStreamer);
+        for (const c of chunks) opts.streamer.callback_function ? opts.streamer.callback_function(c) : captured.callback_function(c);
+        return [{ generated_text: '{"summary":"ok"}' }];
+      },
+      { tokenizer: { name: 'tok' } }
+    );
+
+    const partials = [];
+    const text = await generate(streamingPipeline, 'prompt', {
+      onToken: (p) => partials.push(p),
+      TextStreamer: FakeTextStreamer
+    });
+
+    assert.equal(text, '{"summary":"ok"}', 'full text is still returned for validation');
+    // The UI receives the CUMULATIVE running total, not raw chunks.
+    assert.deepEqual(partials, ['{"sum', '{"summary":', '{"summary":"ok"}']);
+  });
+
+  test('generate does not stream when no TextStreamer is available (graceful)', async () => {
+    const { fakePipeline } = mockTransformers();
+    const partials = [];
+    const text = await generate(fakePipeline, 'prompt', { onToken: (p) => partials.push(p), TextStreamer: null });
+    assert.equal(text, '{"summary":"ok"}');
+    assert.equal(partials.length, 0, 'no streamer, no partials — but generation still works');
+  });
+
   test('disposeModel calls dispose and is safe to call twice', async () => {
     const { fakePipeline } = mockTransformers();
     await disposeModel(fakePipeline);
