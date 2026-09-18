@@ -31,7 +31,17 @@ describe('Export Schemas & Provenance Transparency', () => {
         },
         affectedPages: ['https://example.com/1', 'https://example.com/2'],
         representativeLocator: '.social-link',
-        representativeHtml: '<a href="#"></a>'
+        representativeHtml: '<a href="#"></a>',
+        observations: [
+          {
+            id: 'obs-1',
+            source: { recordPointer: '/results/0/axe/failures/1', originalRef: 'report.json', scanId: '347' },
+            provenance: { scanner: 'axe' },
+            page: { submittedUrl: 'https://example.com/1' },
+            evidence: { locator: '.social-link' },
+            duplicate: { isDuplicate: false }
+          }
+        ]
       }
     ],
     aiProvenance: { generatedByAI: false, model: null, runtime: null }
@@ -45,6 +55,17 @@ describe('Export Schemas & Provenance Transparency', () => {
     assert.equal(parsed.aiProvenance.generatedByAI, false);
     assert.equal(parsed.tasks.length, 1);
     assert.equal(parsed.tasks[0].id, 'TASK-link-name-1');
+  });
+
+  test('JSON export embeds finding-level provenance (record pointers) per task', () => {
+    const parsed = JSON.parse(exportTasksToJson(sampleWorkspace));
+    const obs = parsed.tasks[0].observations;
+    assert.equal(obs.length, 1, 'the task carries its constituent observations');
+    assert.equal(obs[0].recordPointer, '/results/0/axe/failures/1', 'traceable back to the source record');
+    assert.equal(obs[0].scanner, 'axe');
+    assert.equal(obs[0].sourceReport, 'report.json');
+    assert.equal(obs[0].page, 'https://example.com/1');
+    assert.equal(obs[0].locator, '.social-link');
   });
 
   test('JSON-LD export uses real schema.org vocabulary and verified WCAG URLs', () => {
