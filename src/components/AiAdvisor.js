@@ -236,13 +236,20 @@ export class AiAdvisor extends HTMLElement {
       return `<div style="margin-top: var(--space-3); padding: var(--space-3); border-left: 4px solid var(--color-urgency-high); background: var(--color-urgency-high-bg); border-radius: var(--radius-md);">
         <strong style="font-size: var(--font-size-sm);">No usable draft.</strong>
         <p style="font-size: var(--font-size-sm); margin: var(--space-1) 0 0;">${escapeHtml(draft.error)} The deterministic guidance above remains available.</p>
+        ${this.renderRegenerate()}
       </div>`;
     }
     const c = draft.finalCandidate;
     if (!c) {
+      // A withheld draft: instead of a terse "did not pass", tell the user
+      // exactly what the deterministic checks flagged, what would help, and offer
+      // a regenerate. The validation story below carries the specifics.
       return `<div style="margin-top: var(--space-3); padding: var(--space-3); border-left: 4px solid var(--color-urgency-medium); background: var(--color-urgency-medium-bg); border-radius: var(--radius-md);">
-        <strong style="font-size: var(--font-size-sm);">Draft did not pass validation.</strong>
-        <p style="font-size: var(--font-size-sm); margin: var(--space-1) 0 0;">The model's suggestion failed the deterministic checks and was withheld (outcome: ${escapeHtml(draft.outcome || 'unresolved')}). Use the deterministic guidance above.</p>
+        <strong style="font-size: var(--font-size-sm);">The draft was withheld — it didn't pass the deterministic checks.</strong>
+        <p style="font-size: var(--font-size-sm); margin: var(--space-1) 0 0;">The model's suggestion is not shown because it failed validation (outcome: ${escapeHtml(draft.outcome || 'unresolved')}). Use the deterministic guidance above.</p>
+        ${this.renderNextSteps(draft)}
+        ${this.renderValidationStory(draft)}
+        ${this.renderRegenerate()}
       </div>`;
     }
     return `
@@ -256,7 +263,130 @@ export class AiAdvisor extends HTMLElement {
           ${c.targetMarkup ? `<dt style="font-weight:700; margin-top:var(--space-2);">Suggested markup (draft)</dt><dd><pre style="white-space:pre-wrap; overflow-x:auto; background:var(--color-bg-subtle); padding:var(--space-2); border-radius:var(--radius-sm);">${escapeHtml(c.targetMarkup)}</pre></dd>` : ''}
           ${Array.isArray(c.developerDecisionsRequired) && c.developerDecisionsRequired.length ? `<dt style="font-weight:700; margin-top:var(--space-2);">You must decide</dt><dd><ul style="margin-left:var(--space-4);">${c.developerDecisionsRequired.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul></dd>` : ''}
         </dl>
+        ${this.renderDeterministicDiff(c)}
+        ${this.renderValidationStory(draft)}
+        ${this.renderRegenerate()}
       </div>`;
+  }
+
+  /**
+   * B3 — Validation transparency. Turns the hidden validationExport into a
+   * visible, trustworthy story: what each attempt was checked against, whether a
+   * retry ran, the measured value vs. its threshold, and the manual checks that
+   * remain. Renders nothing when there is no attempt data.
+   */
+  renderValidationStory(draft) {
+    const ve = draft.validationExport;
+    const attempts = ve?.attempts || [];
+    if (!attempts.length) return '';
+
+    const retried = attempts.length > 1;
+    const rows = attempts.map(a => {
+      const passed = a.status === 'passed';
+      const label = a.status === 'passed' ? 'passed'
+        : a.status === 'insufficient-evidence' ? 'needs page-level check'
+        : 'failed';
+      const colour = passed ? 'var(--color-urgency-low, #2e7d32)'
+        : a.status === 'insufficient-evidence' ? 'var(--color-urgency-medium)'
+        : 'var(--color-urgency-high)';
+      const measured = this.measuredVsThreshold(a.results);
+      const errs = Array.isArray(a.results?.errors) && a.results.errors.length
+        ? `<div style="color: var(--color-text-secondary);">Flagged: ${escapeHtml(a.results.errors.join('; '))}</div>` : '';
+      return `<li style="margin-bottom: var(--space-1);">
+        <strong>Attempt ${a.attempt}:</strong> <span style="color:${colour};">${escapeHtml(label)}</span>
+        ${a.humanReadableStatus ? `<span style="color: var(--color-text-secondary);"> — ${escapeHtml(a.humanReadableStatus)}</span>` : ''}
+        ${measured ? `<div style="color: var(--color-text-secondary);">${measured}</div>` : ''}
+        ${errs}
+      </li>`;
+    }).join('');
+
+    const manual = ve.manualVerificationRequired || [];
+    return `
+      <details style="margin-top: var(--space-2); font-size: var(--font-size-sm);">
+        <summary style="cursor: pointer; font-weight: 700;">How this draft was checked${retried ? ' (a retry ran)' : ''}</summary>
+        <ol style="margin: var(--space-2) 0 0 var(--space-4);">${rows}</ol>
+        ${manual.length ? `<div style="margin-top: var(--space-2);"><strong>Still needs a human to verify:</strong>
+          <ul style="margin-left: var(--space-4);">${manual.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul></div>` : ''}
+      </details>`;
+  }
+
+  /** Renders "measured X vs required Y" when the validator reported a ratio. */
+  measuredVsThreshold(results) {
+    if (!results || results.ratio === undefined || results.ratio === null) return '';
+    const measured = Number(results.ratio);
+    const required = results.requiredThreshold;
+    if (!Number.isFinite(measured)) return '';
+    const reqText = (required !== undefined && required !== null) ? ` vs. required ${escapeHtml(String(required))}:1` : '';
+    return `Measured contrast ${escapeHtml(measured.toFixed(2))}:1${reqText}`;
+  }
+
+  /**
+   * B4 — Actionable failures. Derives specific next steps from what the last
+   * attempt flagged, rather than a generic "did not pass".
+   */
+  renderNextSteps(draft) {
+    const attempts = draft.validationExport?.attempts || [];
+    const last = attempts[attempts.length - 1];
+    const steps = [];
+    const errorText = (last?.results?.errors || []).join(' ').toLowerCase();
+    const statusText = (last?.humanReadableStatus || '').toLowerCase();
+
+    if (last?.status === 'insufficient-evidence' || /page-level|computed styles|geometry/.test(statusText)) {
+      steps.push('This rule needs page-level verification — check it against the live page (computed styles/geometry are not available from the snippet alone).');
+    }
+    if (/invented|fabricat/.test(errorText) || /invented content/.test(statusText)) {
+      steps.push('The model introduced specific values (e.g. a colour or wording) that were not in the source. Add source context below so the draft can be grounded in your real markup.');
+    }
+    if (/contrast/.test(errorText) || /contrast/.test(statusText)) {
+      steps.push('The suggested colours did not meet the contrast threshold. Provide the real foreground/background colours so a compliant pair can be checked.');
+    }
+    if (!this._task?.sourceContext) {
+      steps.push('Adding source context (the surrounding template or component) usually improves the draft.');
+    }
+    if (!steps.length) steps.push('Try regenerating; if it keeps failing, the deterministic guidance above is the reliable path for this task.');
+
+    return `<div style="margin-top: var(--space-2); font-size: var(--font-size-sm);">
+      <strong>What would help:</strong>
+      <ul style="margin-left: var(--space-4);">${steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+    </div>`;
+  }
+
+  /**
+   * B5 — Draft-vs-deterministic diff. Shows the model's suggested markup beside
+   * the deterministic blueprint's targetMarkup so the user sees exactly what the
+   * model contributed. Renders nothing unless both are present and differ.
+   */
+  renderDeterministicDiff(candidate) {
+    const aiMarkup = candidate?.targetMarkup;
+    const detMarkup = this._task?.blueprint?.targetMarkup;
+    if (!aiMarkup || !detMarkup) return '';
+    if (norm(aiMarkup) === norm(detMarkup)) {
+      return `<p style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">
+        The AI's suggested markup matches the deterministic blueprint — the model added nothing new here.
+      </p>`;
+    }
+    return `
+      <details style="margin-top: var(--space-2); font-size: var(--font-size-sm);">
+        <summary style="cursor: pointer; font-weight: 700;">Compare with the deterministic blueprint</summary>
+        <div style="display: grid; grid-template-columns: 1fr; gap: var(--space-2); margin-top: var(--space-2);">
+          <div>
+            <div style="font-weight: 700; font-size: var(--font-size-xs); color: var(--color-text-secondary);">Deterministic blueprint</div>
+            <pre style="white-space:pre-wrap; overflow-x:auto; background:var(--color-bg-subtle); padding:var(--space-2); border-radius:var(--radius-sm);">${escapeHtml(detMarkup)}</pre>
+          </div>
+          <div>
+            <div style="font-weight: 700; font-size: var(--font-size-xs); color: var(--color-brand-primary);">AI draft (what the model contributed)</div>
+            <pre style="white-space:pre-wrap; overflow-x:auto; background:var(--color-bg-subtle); padding:var(--space-2); border-radius:var(--radius-sm); border-left: 3px solid var(--color-brand-primary);">${escapeHtml(aiMarkup)}</pre>
+          </div>
+        </div>
+      </details>`;
+  }
+
+  /** B4 — a Regenerate button that re-runs the same generation. */
+  renderRegenerate() {
+    if (this._generating) return '';
+    return `<div style="margin-top: var(--space-2);">
+      <button type="button" class="btn btn-secondary" id="ai-regenerate-btn">Regenerate draft</button>
+    </div>`;
   }
 
   /** Shared: run the current provider's generate and store the draft. */
@@ -284,6 +414,12 @@ export class AiAdvisor extends HTMLElement {
     } finally {
       this._generating = false;
       this._streamPartial = '';
+      // Clear the transient "Generating (attempt N)…" progress line — generation
+      // is done, and the draft card below now carries the outcome and details.
+      const done = this._draft?.finalCandidate
+        ? 'Draft ready for review below.'
+        : (this._draft?.error ? '' : 'No draft was produced — see the details below.');
+      aiConsentStore.setState({ message: done });
       this.render();
     }
   }
@@ -343,6 +479,7 @@ export class AiAdvisor extends HTMLElement {
       }
     });
     on('#ai-generate-btn', () => this._generate());
+    on('#ai-regenerate-btn', () => this._generate());
   }
 
   wireRuntime(s) {
@@ -376,12 +513,18 @@ export class AiAdvisor extends HTMLElement {
     });
 
     on('#ai-generate-btn', () => this._generate());
+    on('#ai-regenerate-btn', () => this._generate());
     on('#ai-cancel-gen', () => { this.provider().cancelGeneration?.(); });
   }
 }
 
 function statusLabel(status) {
   return ({ disabled: 'Disabled', consented: 'Enabled', downloading: 'Downloading', ready: 'Ready', error: 'Unavailable' })[status] || status;
+}
+
+/** Whitespace-insensitive comparison for the draft-vs-deterministic markup diff. */
+function norm(s) {
+  return String(s || '').replace(/\s+/g, ' ').trim();
 }
 
 customElements.define('ai-advisor', AiAdvisor);
