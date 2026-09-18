@@ -22,12 +22,23 @@ import { contentHash as shortHash } from './source-registry.js';
 export function remediationFamily(ruleId = '') {
   const r = ruleId.toLowerCase();
   if (/link-name|button-name|input-button-name|aria-command-name|accessible-name/.test(r)) return 'accessible-name';
-  if (/color-contrast/.test(r)) return 'contrast';
+  // Contrast of text against its background (WCAG 1.4.3). Different engines name
+  // the same issue differently: axe color-contrast, equal_access
+  // text_contrast_sufficient. (style_color_misuse is a DIFFERENT issue — misuse
+  // of colour as the only cue — so it is intentionally NOT merged here.)
+  if (/color-contrast|text.?contrast/.test(r)) return 'contrast';
   if (/image-alt|input-image-alt|role-img-alt|alt/.test(r)) return 'text-alternative';
-  if (/region|landmark|heading-order/.test(r)) return 'structure';
+  // Document structure & landmarks (regions, landmarks, heading order, and
+  // "page needs one h1" — the same structural work regardless of the rule id).
+  if (/region|landmark|heading-order|page-has-heading-one/.test(r)) return 'structure';
   if (/label|form-field/.test(r)) return 'form-labeling';
   if (/html-has-lang|lang|valid-lang/.test(r)) return 'language';
   if (/target-size/.test(r)) return 'target-size';
+  // Visible keyboard focus indicator (WCAG 2.4.7): style_focus_visible,
+  // keyboard-accessible/focus-visible.
+  if (/focus.?visible/.test(r)) return 'focus-visible';
+  // Logical keyboard focus order (WCAG 2.4.3).
+  if (/focus.?order/.test(r)) return 'focus-order';
   return `rule-${r}`; // rule-specific family fallback
 }
 

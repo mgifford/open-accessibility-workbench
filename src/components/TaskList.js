@@ -1,11 +1,37 @@
 import { workspaceStore } from '../state/workspace.js';
 import { profileStore } from '../state/profile.js';
 import { routeTaskForProfile } from '../roles/route-task.js';
-import { escapeHtml, escapeAttr } from '../utils/escape-html.js';
+import { escapeHtml, escapeAttr, safeUrl } from '../utils/escape-html.js';
 import { taskStatusStore, TASK_STATUSES, TASK_STATUS_LABELS } from '../state/task-status.js';
 import { renderRoleGuidance } from '../roles/render-role-guidance.js';
 import { buildScanScope } from '../analysis/scan-scope.js';
 import { renderScanHeader } from './scan-header.js';
+
+/** How many affected-page URLs to list per task before "+N more". */
+const MAX_URLS_SHOWN = 3;
+
+/**
+ * Human-readable heading for a remediation family (the shared implementation
+ * action). Rule-specific families (the `rule-<id>` fallback) get a generic
+ * label; the per-task rule id is always shown on the card itself.
+ */
+const FAMILY_LABELS = {
+  'accessible-name': 'Accessible names (links, buttons, controls)',
+  'contrast': 'Colour contrast',
+  'text-alternative': 'Text alternatives for images',
+  'structure': 'Document structure & landmarks',
+  'form-labeling': 'Form labels & names',
+  'language': 'Language of page / parts',
+  'target-size': 'Target size',
+  'focus-visible': 'Visible keyboard focus',
+  'focus-order': 'Keyboard focus order'
+};
+
+function familyLabel(family = '') {
+  if (FAMILY_LABELS[family]) return FAMILY_LABELS[family];
+  if (family.startsWith('rule-')) return `Rule-specific: ${family.slice(5)}`;
+  return family;
+}
 
 /** Decision concern a remediation family requires (mirrors route-task.js). */
 const DECISION_CONCERN = {
@@ -148,53 +174,107 @@ export class TaskList extends HTMLElement {
           </div>
         </div>
 
-        <!-- Task List -->
-        <div style="display: flex; flex-direction: column; gap: var(--space-4);">
-          ${filtered.map(t => `
-            <article class="card" style="margin-bottom: 0;">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2);">
-                <div>
-                  <a href="#/task/${escapeAttr(t.id)}" style="font-size: var(--font-size-lg); font-weight: 700; color: var(--color-brand-primary); text-decoration: none;">${escapeHtml(t.title)}</a>
-                  <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
-                    Rule: <code>${escapeHtml(t.ruleId)}</code> (WCAG ${escapeHtml(t.wcag.join(', ')) || 'N/A'})
-                  </div>
-                </div>
-                <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
-                  ${t.consolidated ? `<span class="badge badge-medium">Consolidated: ${t.metrics.patternVariantCount} patterns</span>` : ''}
-                  <span class="badge badge-${escapeAttr(t.urgency)}" title="How severe/pressing the barrier is">Urgency: ${escapeHtml(t.urgency)}</span>
-                  <span class="badge badge-high" title="How many occurrences/pages this fix addresses">Leverage: ${escapeHtml(t.leverage)}</span>
-                  ${t.componentHypothesis ? `<span class="badge badge-medium" title="Confidence that these patterns share one component">Shared-component confidence: ${escapeHtml(t.componentHypothesis.confidence)}</span>` : ''}
-                </div>
-              </div>
-
-              <div style="margin: var(--space-3) 0; font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-                ${escapeHtml(t.blueprint.problem)}
-              </div>
-
-              ${renderRelevance(routeByTaskId.get(t.id))}
-
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-muted);">
-                <div>
-                  ${renderRoleGuidance(t.roles)}
-                  ${t.componentHypothesis ? ` | <strong>Component:</strong> ${escapeHtml(t.componentHypothesis.name)}` : ''}
-                </div>
-                <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
-                  <span><strong>Affected:</strong> ${t.metrics.affectedPagesCount} pages (${t.metrics.observationCount} occurrences)</span>
-                  <label style="display: flex; align-items: center; gap: var(--space-1); max-width: 100%;">
-                    <span style="font-weight: 700;">Status</span>
-                    <select class="task-status-select" data-task-id="${escapeAttr(t.id)}" style="max-width: 100%; padding: var(--space-1); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
-                      ${TASK_STATUSES.map(s => `<option value="${s}" ${taskStatusStore.get(t.id) === s ? 'selected' : ''}>${TASK_STATUS_LABELS[s]}</option>`).join('')}
-                    </select>
-                  </label>
-                </div>
-              </div>
-            </article>
-          `).join('')}
-        </div>
+        <!-- Task List, grouped by remediation family -->
+        ${this.renderGroupedTasks(filtered, routeByTaskId)}
       </section>
     `;
 
     this.setupListeners();
+  }
+
+  /**
+   * Groups the visible tasks by remediation family (the shared implementation
+   * action) and renders a labelled section per family, so related tasks cluster
+   * and the CSV's many rule-specific findings become scannable instead of a flat
+   * wall. Groups are ordered by task count (biggest, most-leveraged families
+   * first), then by label; within a group the existing sort order is preserved.
+   */
+  renderGroupedTasks(filtered, routeByTaskId) {
+    if (filtered.length === 0) {
+      return `<p style="color: var(--color-text-muted);">No tasks match the current filters.</p>`;
+    }
+    const groups = new Map();
+    for (const t of filtered) {
+      const fam = t.remediationFamily || t.ruleId;
+      if (!groups.has(fam)) groups.set(fam, []);
+      groups.get(fam).push(t);
+    }
+    const ordered = [...groups.entries()].sort((a, b) =>
+      b[1].length - a[1].length || familyLabel(a[0]).localeCompare(familyLabel(b[0])));
+
+    return ordered.map(([family, tasks]) => `
+      <section aria-label="${escapeAttr(familyLabel(family))}" style="margin-bottom: var(--space-6);">
+        <h3 style="font-size: var(--font-size-base); font-weight: 700; border-bottom: 2px solid var(--color-border); padding-bottom: var(--space-1); margin-bottom: var(--space-3);">
+          ${escapeHtml(familyLabel(family))}
+          <span style="font-weight: 400; font-size: var(--font-size-sm); color: var(--color-text-muted);">— ${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}</span>
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+          ${tasks.map(t => this.renderTaskCard(t, routeByTaskId.get(t.id))).join('')}
+        </div>
+      </section>`).join('');
+  }
+
+  renderTaskCard(t, route) {
+    return `
+      <article class="card" style="margin-bottom: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2);">
+          <div>
+            <a href="#/task/${escapeAttr(t.id)}" style="font-size: var(--font-size-lg); font-weight: 700; color: var(--color-brand-primary); text-decoration: none;">${escapeHtml(t.title)}</a>
+            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
+              Rule: <code>${escapeHtml(t.ruleId)}</code> (WCAG ${escapeHtml(t.wcag.join(', ')) || 'N/A'})
+            </div>
+          </div>
+          <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+            ${t.consolidated ? `<span class="badge badge-medium">Consolidated: ${t.metrics.patternVariantCount} patterns</span>` : ''}
+            <span class="badge badge-${escapeAttr(t.urgency)}" title="How severe/pressing the barrier is">Urgency: ${escapeHtml(t.urgency)}</span>
+            <span class="badge badge-high" title="How many occurrences/pages this fix addresses">Leverage: ${escapeHtml(t.leverage)}</span>
+            ${t.componentHypothesis ? `<span class="badge badge-medium" title="Confidence that these patterns share one component">Shared-component confidence: ${escapeHtml(t.componentHypothesis.confidence)}</span>` : ''}
+          </div>
+        </div>
+
+        <div style="margin: var(--space-3) 0; font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+          ${escapeHtml(t.blueprint.problem)}
+        </div>
+
+        ${renderRelevance(route)}
+
+        ${this.renderAffectedUrls(t)}
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-muted);">
+          <div>
+            ${renderRoleGuidance(t.roles)}
+            ${t.componentHypothesis ? ` | <strong>Component:</strong> ${escapeHtml(t.componentHypothesis.name)}` : ''}
+          </div>
+          <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
+            <span><strong>Affected:</strong> ${t.metrics.affectedPagesCount} pages (${t.metrics.observationCount} occurrences)</span>
+            <label style="display: flex; align-items: center; gap: var(--space-1); max-width: 100%;">
+              <span style="font-weight: 700;">Status</span>
+              <select class="task-status-select" data-task-id="${escapeAttr(t.id)}" style="max-width: 100%; padding: var(--space-1); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+                ${TASK_STATUSES.map(s => `<option value="${s}" ${taskStatusStore.get(t.id) === s ? 'selected' : ''}>${TASK_STATUS_LABELS[s]}</option>`).join('')}
+              </select>
+            </label>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  /**
+   * Lists the specific pages a task affects (the URLs), so a user can go look at
+   * them — the first few inline, the rest behind a <details>. Empty when the task
+   * carries no page URLs.
+   */
+  renderAffectedUrls(t) {
+    const urls = Array.isArray(t.affectedPages) ? t.affectedPages : [];
+    if (urls.length === 0) return '';
+    const link = (u) => `<li style="margin-top: var(--space-1); word-break: break-all;"><a href="${escapeAttr(safeUrl(u))}" target="_blank" rel="noopener noreferrer">${escapeHtml(u)}</a></li>`;
+    const shown = urls.slice(0, MAX_URLS_SHOWN);
+    const rest = urls.slice(MAX_URLS_SHOWN);
+    return `
+      <div style="margin: var(--space-2) 0 var(--space-3); font-size: var(--font-size-xs);">
+        <span style="font-weight: 700; color: var(--color-text-secondary);">Pages to review:</span>
+        <ul style="list-style: none; margin-top: var(--space-1);">${shown.map(link).join('')}</ul>
+        ${rest.length ? `<details style="margin-top: var(--space-1);"><summary style="cursor: pointer; color: var(--color-brand-primary);">+${rest.length} more ${rest.length === 1 ? 'page' : 'pages'}</summary><ul style="list-style: none; margin-top: var(--space-1);">${rest.map(link).join('')}</ul></details>` : ''}
+      </div>`;
   }
 
   setupListeners() {
