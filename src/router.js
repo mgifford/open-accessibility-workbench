@@ -59,18 +59,29 @@ export class Router {
   }
 
   /**
-   * On a user-initiated navigation, politely announce the new view and move
-   * keyboard focus to the main region so keyboard and screen-reader users land
-   * in the new content. Skipped on the initial paint.
+   * On a user-initiated navigation, politely announce the new view and land the
+   * user at the TOP of the page — like a fresh page load — with the header and
+   * navigation visible. Focus moves to the header (programmatically focusable)
+   * rather than <main>, so keyboard and screen-reader users start above the new
+   * content instead of below the nav at the H1. Skipped on the initial paint.
    */
   afterNavigate(label, outlet, isInitial) {
     const announcer = document.getElementById('live-announcer');
     if (announcer) {
       announcer.textContent = `${label} view loaded.`;
     }
-    if (!isInitial && typeof outlet.focus === 'function') {
-      // outlet is <main tabindex="-1">, so it is programmatically focusable.
-      outlet.focus();
+    if (isInitial) return;
+
+    // Focus the top-of-page header without letting focus() scroll it partially
+    // into view, then explicitly reset the scroll so the very top (header + nav)
+    // is shown. Falls back to <main> if the header is not present/focusable.
+    const header = document.getElementById('app-header');
+    const target = header && typeof header.focus === 'function' ? header : outlet;
+    if (target && typeof target.focus === 'function') {
+      target.focus({ preventScroll: true });
+    }
+    if (typeof window.scrollTo === 'function') {
+      window.scrollTo(0, 0);
     }
   }
 }

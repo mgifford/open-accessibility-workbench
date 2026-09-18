@@ -58,11 +58,14 @@ test('Phase 6/9 gate: tasks are reachable and a task can be inspected with AI di
   await expect(page.locator('main')).toContainText('{{');
 });
 
-test('Phase 1 keyboard: nav links are reachable and route change moves focus to main', async ({ page }) => {
+test('Phase 1 keyboard: nav links are reachable and route change lands at the top of the page', async ({ page }) => {
   // The report-dependent nav links (incl. Tasks) appear only once a report is
   // loaded, so load one first, then drive the Tasks link with the keyboard.
   await page.getByRole('button', { name: /Load Pattern-Reduction Demo/i }).click();
   await expect(page).toHaveURL(/#\/overview/);
+
+  // Scroll down first so we can verify navigation returns to the top of the page.
+  await page.evaluate(() => window.scrollTo(0, 400));
 
   // Activate the Tasks nav link with the keyboard.
   const tasksLink = page.getByRole('link', { name: 'Tasks', exact: true });
@@ -70,9 +73,12 @@ test('Phase 1 keyboard: nav links are reachable and route change moves focus to 
   await tasksLink.focus();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#\/tasks/);
-  // Focus is moved to the main region on user navigation (Phase 1 router fix).
-  // Poll (auto-retry) so the assertion doesn't race the router's focus() call.
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('app-root');
+  // Focus is moved to the header (top of page), not <main> under the nav, so the
+  // user starts at the top with the navigation visible. Poll (auto-retry) so the
+  // assertion doesn't race the router's focus() call.
+  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('app-header');
+  // The viewport is scrolled back to the very top.
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   // The polite announcer reflects the view change.
   await expect(page.locator('#live-announcer')).toContainText(/view loaded/i);
 });
