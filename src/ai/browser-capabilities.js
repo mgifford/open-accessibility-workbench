@@ -66,6 +66,62 @@ async function probePromptApi(root, timeoutMs) {
   }
 }
 
+// A short, unusual probe whose correct answer is a single known word. A real
+// model answers with (or containing) the word; a stub Prompt API that echoes
+// the input — some Chromium builds expose one that replies "On-device model is
+// not available in Chromium, this API is just echoing back the input: …" — does
+// not. The probe is deliberately tiny so a functional model answers instantly
+// and it costs almost nothing.
+const SELF_TEST_PROMPT = 'Reply with only the word READY and nothing else.';
+const SELF_TEST_EXPECTED = 'ready';
+
+/**
+ * Runs ONE tiny generation against an already-usable Prompt API session to
+ * confirm it actually produces model output rather than echoing the prompt or
+ * returning a "not available" stub. Never triggers a download (callers only run
+ * this once the model is ready/prepared). Returns a structured verdict; on any
+ * error it reports `usable: false` with the reason so the caller can fall back.
+ *
+ * @param {object} languageModel - the resolved Prompt API (window.LanguageModel)
+ * @param {number} [timeoutMs]
+ * @returns {Promise<{ usable: boolean, reason: string, sample?: string }>}
+ */
+export async function verifyPromptApiUsable(languageModel, timeoutMs = 8000) {
+  if (!languageModel || typeof languageModel.create !== 'function') {
+    return { usable: false, reason: 'Prompt API cannot create a session.' };
+  }
+  let session = null;
+  try {
+    session = await withTimeout(Promise.resolve(languageModel.create()), timeoutMs);
+    const raw = await withTimeout(Promise.resolve(session.prompt(SELF_TEST_PROMPT)), timeoutMs);
+    const text = String(raw ?? '').trim();
+    const lower = text.toLowerCase();
+
+    // A stub that echoes the prompt back, or announces it is not a real model.
+    if (lower.includes(SELF_TEST_PROMPT.toLowerCase())) {
+      return { usable: false, reason: 'The browser AI echoed the prompt instead of answering — no real on-device model is available.', sample: text.slice(0, 120) };
+    }
+    if (/not available|just echoing|echo(ing)? back the input|placeholder|stub/i.test(text)) {
+      return { usable: false, reason: 'The browser reports its on-device AI is not actually available here.', sample: text.slice(0, 120) };
+    }
+    // Empty output is not a working model either.
+    if (text === '') {
+      return { usable: false, reason: 'The browser AI returned no output.' };
+    }
+    // A working model answers with the expected token (models may add
+    // punctuation/casing); accept any non-echo, non-empty answer that contains it,
+    // but also accept a short plausible answer even if the exact token drifted.
+    const answered = lower.includes(SELF_TEST_EXPECTED) || text.length <= 40;
+    return answered
+      ? { usable: true, reason: 'Self-test produced a real answer.', sample: text.slice(0, 120) }
+      : { usable: false, reason: 'The browser AI did not produce a usable answer to a basic prompt.', sample: text.slice(0, 120) };
+  } catch (error) {
+    return { usable: false, reason: `Browser AI self-test failed: ${error.message}` };
+  } finally {
+    try { session?.destroy?.(); } catch { /* ignore */ }
+  }
+}
+
 // Below this many gigabytes of reported device memory, loading a browser local
 // model (~110–350 MB weights, plus WebGPU working buffers) is likely to exhaust
 // memory. On unified-memory machines that pressure can stall the compositor and

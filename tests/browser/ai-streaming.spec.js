@@ -23,12 +23,16 @@ const VALID_JSON = JSON.stringify({
 test('browser Prompt API: draft streams live, then commits as a validated DRAFT', async ({ page }) => {
   await page.addInitScript((valid) => {
     function* chunks(s, n) { const size = Math.ceil(s.length / n); for (let i = 0; i < s.length; i += size) yield s.slice(i, i + size); }
+    const isProbe = (p) => typeof p === 'string' && /READY/.test(p) && p.length < 80;
     // eslint-disable-next-line no-undef
     window.LanguageModel = {
       availability: async () => 'available',
       create: async () => ({
-        prompt: async () => valid,
-        promptStreaming: () => (async function* () {
+        // Answer the provider's usability self-test with a real short reply; the
+        // remediation JSON is returned for the actual generation prompt.
+        prompt: async (p) => (isProbe(p) ? 'READY' : valid),
+        promptStreaming: (p) => (async function* () {
+          if (isProbe(p)) { yield 'READY'; return; }
           for (const c of chunks(valid, 8)) { await new Promise(r => setTimeout(r, 40)); yield c; }
         })(),
         destroy() {}
