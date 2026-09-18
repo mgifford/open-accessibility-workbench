@@ -127,12 +127,12 @@ describe('Phase 8 hardening: exports carry technology context + guidance', () =>
     assert.match(gh, /Technology Context.*Drupal/);
   });
 
-  test('JSON-LD export includes technology context and guidance', async () => {
+  test('JSON-LD export carries technology context as the Action instrument', async () => {
     const { exportTasksToJsonLd } = await import('../../src/export/jsonld.js');
     const ld = JSON.parse(exportTasksToJsonLd({ tasks: [task], observations: [], sourceSummary: {} }));
-    const exported = ld.remediationTasks[0];
-    assert.equal(exported.technologyContext.name, 'Drupal');
-    assert.ok(exported.actionableBlueprint.technologyGuidance);
+    const item = ld.itemListElement[0].item;
+    assert.equal(item.instrument['@type'], 'SoftwareApplication');
+    assert.equal(item.instrument.name, 'Drupal');
   });
 });
 
