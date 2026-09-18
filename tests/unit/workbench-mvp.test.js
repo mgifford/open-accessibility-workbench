@@ -189,13 +189,15 @@ describe('Phase 9 hardening: no invented content; honest validation & handoff', 
     assert.match(md, /\/results\/0\/axe\/failures\/1/);
   });
 
-  test('curated guidance provenance appears in Markdown and JSON-LD exports', () => {
+  test('curated guidance provenance appears in the Markdown export', () => {
     const bp = generateRemediationBlueprint({ ruleId: 'link-name', cluster: {}, technologyContext: null });
     const task = { id: 'T', title: 'x', ruleId: 'link-name', wcag: ['2.4.4'], urgency: 'high', leverage: 'high', metrics: {}, roles: {}, blueprint: bp, affectedPages: [], observations: [] };
     const md = exportTasksToMarkdown({ tasks: [task], observations: [], sourceSummary: {} });
     assert.match(md, /Curated Guidance/);
     assert.match(md, /Source:/);
+    // The slim schema.org JSON-LD export (PR #16) intentionally omits the
+    // curated-guidance block; it still carries the core task facts.
     const ld = JSON.parse(exportTasksToJsonLd({ tasks: [task], observations: [], sourceSummary: {} }));
-    assert.ok(ld.remediationTasks[0].actionableBlueprint.curatedGuidance.provenance);
+    assert.equal(ld.itemListElement[0].item.identifier, 'T');
   });
 });

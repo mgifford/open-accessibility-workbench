@@ -57,7 +57,7 @@ test('browser Prompt API: draft streams live, then commits as a validated DRAFT'
   await expect(preview).toContainText(/raw model output/i);
 
   // It is replaced by the validated DRAFT, and the raw preview is gone.
-  await expect(advisor.getByText(/AI DRAFT/i)).toBeVisible();
+  await expect(advisor.getByText('AI DRAFT — review required')).toBeVisible();
   await expect(advisor).toContainText(/Give the link a discernible accessible name/i);
   await expect(page.locator('#ai-stream-preview')).toHaveCount(0);
 });
