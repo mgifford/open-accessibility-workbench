@@ -48,6 +48,32 @@ const routes = {
           <li>Full Data Provenance: every aggregate task traces back to its scanner evidence.</li>
         </ul>
       </div>
+
+      <h3 style="font-weight: 700; font-size: var(--font-size-lg); margin-top: var(--space-6);">Optional: local AI assistance</h3>
+      <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin: var(--space-2) 0;">
+        Every remediation task is fully explained by the deterministic engine — you never need AI to use the Workbench.
+        On a task's detail page you can <strong>optionally</strong> turn on a local AI advisor to draft a suggested fix
+        (for example, sketching the markup for an accessible name, or explaining a rule in plainer terms). It is
+        <strong>off until you explicitly enable it</strong>, and no model is downloaded when the app or a report loads.
+      </p>
+      <div style="background-color: var(--color-bg-subtle); padding: var(--space-4); border-radius: var(--radius-md); font-size: var(--font-size-sm);">
+        <p style="margin: 0 0 var(--space-2);"><strong>How to use it:</strong></p>
+        <ol style="margin-left: var(--space-4);">
+          <li>Load a report, open the <em>Tasks</em> view, and select a task to open its detail page.</li>
+          <li>In the <em>Local AI advisor</em> panel, read the on-device / privacy note and choose <em>Enable local AI</em>.</li>
+          <li>When your browser provides a built-in on-device model, or this deployment ships the optional model, choose <em>Generate draft suggestion</em>. A draft appears beside the deterministic guidance.</li>
+        </ol>
+        <p style="margin: var(--space-3) 0 var(--space-2);"><strong>What runs, and where:</strong></p>
+        <ul style="margin-left: var(--space-4);">
+          <li><strong>Inference is entirely on your device.</strong> Your report is never uploaded — not to us, not to any AI service.</li>
+          <li>Two routes are used, whichever is available: your <strong>browser's built-in on-device AI</strong> (nothing is downloaded from this project), or a small <strong>open model run in your browser</strong> via a background worker (only in deployments built with the model runtime enabled).</li>
+          <li>If a model's weights are downloaded, only the <strong>weights</strong> are fetched from the host you pick (Hugging Face or this project's release); that host sees your IP address and which model — <strong>never</strong> your report.</li>
+          <li>AI output is an <strong>unverified draft for a human to review</strong>. It is never applied automatically, always shown next to the deterministic guidance, and passes the same anti-invention and validation checks — the advisor even shows what each attempt was checked against.</li>
+          <li>When no usable AI is present, the panel says so honestly and the deterministic guidance works fully without it.</li>
+        </ul>
+        <p style="margin: var(--space-3) 0 0;"><strong>Are MCP servers involved?</strong> No. The Workbench is a self-contained, client-side web app: all AI runs in your browser, with no server-side calls and no Model Context Protocol (MCP) connections. MCP is a protocol for connecting AI <em>agents and developer tools</em> to external services — it is not part of how this app assists you. (Separately, the maintainers may use MCP or similar tooling at build time to prepare bundled data such as rule mappings; that is a development step, not a runtime feature, and it never touches your report.)</p>
+      </div>
+
       <local-data-controls></local-data-controls>
     </section>
   `
