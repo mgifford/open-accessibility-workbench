@@ -283,7 +283,8 @@ function renderRuleGuidance(g) {
       <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">${escapeHtml(g.summary)}</p>
       ${g.decisions?.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; margin-top: var(--space-2);">Decisions</p><ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${list(g.decisions)}</ul>` : ''}
       ${g.implementation?.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; margin-top: var(--space-2);">Implementation</p><ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${list(g.implementation)}</ul>` : ''}
-      ${g.verification?.length ? `<p style="font-size: var(--font-size-xs); font-weight: 700; margin-top: var(--space-2);">Verification</p><ul style="font-size: var(--font-size-sm); margin-left: var(--space-4);">${list(g.verification)}</ul>` : ''}
+      <!-- Verification is rendered once, in the dedicated "Verification Steps" section
+           below (fed by blueprint.verificationSteps, which is g.verification). -->
       <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2);">
         ${g.curated ? 'Curated Workbench guidance' : 'Generic Workbench guidance'} &bull;
         Source: ${p.sourceUrl ? `<a href="${escapeAttr(safeUrl(p.sourceUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.source)}</a>` : escapeHtml(p.source || 'Workbench')}

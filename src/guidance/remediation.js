@@ -49,11 +49,24 @@ export function generateRemediationBlueprint(taskMeta) {
   const occurrencesCount = cluster.occurrencesCount || 1;
   const isMultiPage = pagesCount > 1;
 
-  let problem = genericProblemStatement(ruleId, cluster);
+  // Curated, versioned rule guidance with provenance (spec §9.1). This is the
+  // SINGLE SOURCE OF TRUTH for the framework-neutral remediation pattern: the
+  // per-rule problem statement, objective, placeholder markup, human decisions,
+  // and verification steps all come from public/data/rules/rule-guidance.json
+  // (via rule-guidance.generated.js). remediation.js no longer hardcodes them,
+  // so the curated block and the remediation pattern can never drift apart.
+  const ruleGuidance = getExactRuleGuidance(ruleId);
+  const rem = ruleGuidance.curated ? (ruleGuidance.remediation || null) : null;
+
   let whySystemic = isMultiPage
     ? `This pattern recurs across ${pagesCount} pages (${occurrencesCount} total occurrences), indicating a shared component, template, or global token.`
     : `This failure was observed on a single page, but may affect other instances of this component.`;
   let likelyRootCause = componentHypothesis?.rationale || 'Reused markup structure in site templates.';
+
+  // Deterministic generic defaults for a rule with no curated remediation. The
+  // problem statement prefers the scanner's own description, then a verified
+  // friendly title, then an honest rule-id fallback — never invented content.
+  let problem = genericProblemStatement(ruleId, cluster);
   let whatNeedsToChange = 'Update the element markup or styling to satisfy WCAG criteria.';
   let humanDecisionsRequired = [];
   let targetMarkup = null;
@@ -64,62 +77,19 @@ export function generateRemediationBlueprint(taskMeta) {
     'Re-run automated accessibility scans.'
   ];
 
-  // Target markup is a STRUCTURAL PATTERN with explicit placeholders for every
-  // value a human must decide. It never invents accessible names, alt text,
-  // labels, colours, or design-token architecture (spec §3.5). Placeholders are
-  // written in {{ }} so they are obviously unresolved, not a finished fix.
-  if (ruleId === 'link-name') {
-    problem = 'Links do not have discernible, accessible text communicating their destination.';
-    whatNeedsToChange = 'Provide an accessible name for the link. Prefer visible text; for an icon-only link, add visually-hidden text or an accessible name.';
-    humanDecisionsRequired = [
-      'Determine the human-readable purpose/destination of each link (a content decision).',
-      'Decide whether to use visible text, visually-hidden text, or an accessible name.'
-    ];
-    targetMarkup = `<!-- Pattern (fill in the human-decided values):\n     Option A — visible text:  <a href="{{ href }}">{{ link purpose }}</a>\n     Option B — icon-only:     <a href="{{ href }}"><span aria-hidden="true">{{ icon }}</span><span class="visually-hidden">{{ link purpose }}</span></a> -->`;
-    verificationSteps = [
-      'Inspect the computed accessible name in the browser accessibility tree.',
-      'Tab to the link and verify a screen reader announces its purpose.',
-      'Re-run the automated link-name rule.'
-    ];
-  } else if (ruleId === 'color-contrast') {
-    problem = 'Elements have insufficient color contrast between text and background.';
-    whatNeedsToChange = 'Change the text or background colour (ideally a design token) to meet the required ratio (4.5:1 normal text, 3:1 large text). The specific accessible colour is a design decision.';
-    humanDecisionsRequired = [
-      'Choose an approved accessible colour/token that meets the ratio (a Visual Design decision — the Workbench does not choose the colour).',
-      'Decide whether the affected text qualifies as large text (3:1) or normal text (4.5:1).'
-    ];
-    targetMarkup = `/* Pattern — set the token to a colour Visual Design confirms meets the ratio: */\n:root {\n  --color-foreground: {{ accessible colour, ratio >= 4.5:1 against its background }};\n}`;
-    verificationSteps = [
-      'Measure the chosen colours with a contrast tool or DevTools.',
-      'Verify readability in forced-colors / high-contrast mode.',
-      'Re-run the automated color-contrast rule.'
-    ];
-  } else if (ruleId === 'image-alt') {
-    problem = 'Images lack a text alternative, so non-sighted users cannot understand their content.';
-    whatNeedsToChange = 'Provide a text alternative appropriate to each image: descriptive alt for informative images, empty alt for decorative images.';
-    humanDecisionsRequired = [
-      'Determine whether each image is informative or decorative.',
-      'For informative images, decide what the alternative should convey (a content decision — the Workbench does not write alt text).'
-    ];
-    targetMarkup = `<!-- Informative: --> <img src="{{ src }}" alt="{{ what the image conveys }}" />\n<!-- Decorative: --> <img src="{{ src }}" alt="" />`;
-    verificationSteps = [
-      'Confirm the alt attribute is present and appropriate to the image’s purpose.',
-      'Verify a screen reader announces informative images and skips decorative ones.',
-      'Re-run the automated image-alt rule.'
-    ];
-  } else if (ruleId === 'region') {
-    problem = 'Content is not contained within landmark regions.';
-    whatNeedsToChange = 'Wrap major page areas in semantic HTML5 landmarks (<header>, <nav>, <main>, <footer>).';
-    humanDecisionsRequired = [
-      'Confirm the primary content boundary for <main>.',
-      'If more than one navigation region exists, decide a distinguishing label for each (a structure decision).'
-    ];
-    targetMarkup = `<header>{{ site header }}</header>\n<nav aria-label="{{ label if multiple navs }}">{{ navigation }}</nav>\n<main>{{ primary page content }}</main>\n<footer>{{ site footer }}</footer>`;
-    verificationSteps = [
-      'Confirm exactly one <main> element per page.',
-      'Navigate by landmark with a screen reader.',
-      'Re-run the automated region rule.'
-    ];
+  // Curated remediation overrides the generic defaults. Target markup is a
+  // STRUCTURAL PATTERN with explicit {{ }} placeholders for every value a human
+  // must decide; it never invents accessible names, alt text, labels, colours,
+  // or design-token architecture (spec §3.5). The curated verification list is
+  // the one canonical set of steps (also surfaced as ruleGuidance.verification).
+  if (rem) {
+    if (rem.problem) problem = rem.problem;
+    if (rem.whatNeedsToChange) whatNeedsToChange = rem.whatNeedsToChange;
+    if (Array.isArray(rem.humanDecisionsRequired)) humanDecisionsRequired = rem.humanDecisionsRequired;
+    if (rem.targetMarkup) targetMarkup = rem.targetMarkup;
+  }
+  if (ruleGuidance.curated && Array.isArray(ruleGuidance.verification) && ruleGuidance.verification.length) {
+    verificationSteps = ruleGuidance.verification;
   }
 
   // Technology-specific guidance EXTENDS the framework-neutral objective above;
@@ -131,8 +101,6 @@ export function generateRemediationBlueprint(taskMeta) {
     technologyContext
   );
 
-  // Curated, versioned rule guidance with provenance (spec §9.1).
-  const ruleGuidance = getExactRuleGuidance(ruleId);
   const family = remediationFamily || familyFromRule(ruleId);
   const decisionRole = DECISION_ROLE[family] || null;
 
