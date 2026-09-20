@@ -1,13 +1,13 @@
 // GENERATED from public/data/rules/rule-guidance.json — run `npm run build:data`. Do not edit by hand.
 export const RULE_GUIDANCE = {
   "_meta": {
-    "schemaVersion": "1.0",
-    "revision": "2026-08-31",
+    "schemaVersion": "1.1",
+    "revision": "2026-09-20",
     "source": "Open Accessibility Workbench curated guidance",
     "sourceUrl": "https://github.com/mgifford/open-accessibility-workbench",
     "license": "GPL-3.0-or-later",
     "basedOn": "WCAG 2.2 Understanding & Techniques (W3C, https://www.w3.org/WAI/WCAG22/, W3C Software and Document Notice and License)",
-    "note": "Workbench guidance — NOT scanner documentation. It never invents alt text, names, labels, colours, or product behaviour; those are identified as human decisions. One implementation does not necessarily satisfy every failure mapped to a WCAG success criterion."
+    "note": "Workbench guidance — NOT scanner documentation. It never invents alt text, names, labels, colours, or product behaviour; those are identified as human decisions. One implementation does not necessarily satisfy every failure mapped to a WCAG success criterion. This file is the single source of truth for both the curated guidance block (summary/decisions/implementation/verification) and the framework-neutral remediation pattern (remediation.*) rendered by the Workbench; src/guidance/remediation.js reads these fields rather than hardcoding them."
   },
   "rules": {
     "link-name": {
@@ -22,9 +22,18 @@ export const RULE_GUIDANCE = {
       ],
       "verification": [
         "Inspect the computed accessible name in the browser accessibility tree.",
-        "Operate the link with the keyboard.",
+        "Tab to the link and verify a screen reader announces its purpose.",
         "Re-run the automated rule."
-      ]
+      ],
+      "remediation": {
+        "problem": "Links do not have discernible, accessible text communicating their destination.",
+        "whatNeedsToChange": "Provide an accessible name for the link. Prefer visible text; for an icon-only link, add visually-hidden text or an accessible name.",
+        "humanDecisionsRequired": [
+          "Determine the human-readable purpose/destination of each link (a content decision).",
+          "Decide whether to use visible text, visually-hidden text, or an accessible name."
+        ],
+        "targetMarkup": "<!-- Pattern (fill in the human-decided values):\n     Option A — visible text:  <a href=\"{{ href }}\">{{ link purpose }}</a>\n     Option B — icon-only:     <a href=\"{{ href }}\"><span aria-hidden=\"true\">{{ icon }}</span><span class=\"visually-hidden\">{{ link purpose }}</span></a> -->"
+      }
     },
     "color-contrast": {
       "rule": "color-contrast",
@@ -37,9 +46,18 @@ export const RULE_GUIDANCE = {
       ],
       "verification": [
         "Measure the contrast ratio with a contrast tool or DevTools.",
-        "Check readability in forced-colors / high-contrast mode.",
+        "Verify readability in forced-colors / high-contrast mode.",
         "Re-run the automated rule."
-      ]
+      ],
+      "remediation": {
+        "problem": "Elements have insufficient color contrast between text and background.",
+        "whatNeedsToChange": "Change the text or background colour (ideally a design token) to meet the required ratio (4.5:1 normal text, 3:1 large text). The specific accessible colour is a design decision.",
+        "humanDecisionsRequired": [
+          "Choose an approved accessible colour/token that meets the ratio (a Visual Design decision — the Workbench does not choose the colour).",
+          "Decide whether the affected text qualifies as large text (3:1) or normal text (4.5:1)."
+        ],
+        "targetMarkup": "/* Pattern — set the token to a colour Visual Design confirms meets the ratio: */\n:root {\n  --color-foreground: {{ accessible colour, ratio >= 4.5:1 against its background }};\n}"
+      }
     },
     "image-alt": {
       "rule": "image-alt",
@@ -54,10 +72,19 @@ export const RULE_GUIDANCE = {
         "Fix the source field/formatter for CMS-managed images rather than the rendered markup."
       ],
       "verification": [
-        "Confirm the alt attribute is present and appropriate.",
+        "Confirm the alt attribute is present and appropriate to the image’s purpose.",
         "Verify a screen reader announces informative images and skips decorative ones.",
         "Re-run the automated rule."
-      ]
+      ],
+      "remediation": {
+        "problem": "Images lack a text alternative, so non-sighted users cannot understand their content.",
+        "whatNeedsToChange": "Provide a text alternative appropriate to each image: descriptive alt for informative images, empty alt for decorative images.",
+        "humanDecisionsRequired": [
+          "Determine whether each image is informative or decorative.",
+          "For informative images, decide what the alternative should convey (a content decision — the Workbench does not write alt text)."
+        ],
+        "targetMarkup": "<!-- Informative: --> <img src=\"{{ src }}\" alt=\"{{ what the image conveys }}\" />\n<!-- Decorative: --> <img src=\"{{ src }}\" alt=\"\" />"
+      }
     },
     "region": {
       "rule": "region",
@@ -69,10 +96,19 @@ export const RULE_GUIDANCE = {
         "Give each <nav> a distinguishing aria-label only when more than one exists."
       ],
       "verification": [
-        "Confirm exactly one <main> per page.",
+        "Confirm exactly one <main> element per page.",
         "Navigate by landmark with a screen reader.",
         "Re-run the automated rule."
-      ]
+      ],
+      "remediation": {
+        "problem": "Content is not contained within landmark regions.",
+        "whatNeedsToChange": "Wrap major page areas in semantic HTML5 landmarks (<header>, <nav>, <main>, <footer>).",
+        "humanDecisionsRequired": [
+          "Confirm the primary content boundary for <main>.",
+          "If more than one navigation region exists, decide a distinguishing label for each (a structure decision)."
+        ],
+        "targetMarkup": "<header>{{ site header }}</header>\n<nav aria-label=\"{{ label if multiple navs }}\">{{ navigation }}</nav>\n<main>{{ primary page content }}</main>\n<footer>{{ site footer }}</footer>"
+      }
     }
   }
 };

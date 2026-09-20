@@ -51,7 +51,8 @@ export function exportTasksToMarkdown(workspaceData) {
       lines.push(`#### Curated Guidance`);
       lines.push(rg.summary);
       if (rg.implementation?.length) { lines.push(`- Implementation: ${rg.implementation.join(' ')}`); }
-      if (rg.verification?.length) { lines.push(`- Verification: ${rg.verification.join(' ')}`); }
+      // Verification is emitted once, in the dedicated "Verification Steps"
+      // section below (blueprint.verificationSteps is sourced from rg.verification).
       const p = rg.provenance || {};
       lines.push(`_Source: ${p.source || 'Workbench'}${p.sourceUrl ? ` (${p.sourceUrl})` : ''}${p.revision ? `, rev ${p.revision}` : ''}${p.license ? `, ${p.license}` : ''}._`);
       lines.push(``);

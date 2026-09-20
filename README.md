@@ -60,6 +60,7 @@ the unit and browser test suites.
 - [Pattern Engine & Signatures](docs/PATTERN_ENGINE.md)
 - [Role Routing & ARRM](docs/ROLE_ROUTING.md)
 - [Technology Context](docs/TECHNOLOGY_CONTEXT.md)
+- [Remediation Guidance Pipeline](docs/GUIDANCE_PIPELINE.md)
 - [Deterministic Validation](docs/VALIDATION.md)
 - [In-Browser AI Architecture](docs/AI_ARCHITECTURE.md)
 - [Export Schemas](docs/EXPORT_SCHEMA.md)
