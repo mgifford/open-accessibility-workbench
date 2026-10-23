@@ -29,7 +29,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
-    "vite": "^8.2.2"
+    "vite": "^8.2.4"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0"
